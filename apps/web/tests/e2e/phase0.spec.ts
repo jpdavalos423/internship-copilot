@@ -56,7 +56,7 @@ async function runAnalysisAndVerify(page: Page) {
 
 test("shows client-side validation for empty profile and job forms", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Phase 0 Dashboard" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Internship Dashboard" })).toBeVisible();
 
   await goToPrimaryNav(page, "Profile");
   await expect(page).toHaveURL(/\/profile$/);
@@ -97,7 +97,7 @@ test("Phase 0 workflow saves a profile, creates a job, and runs analysis", async
   await test.step("Open homepage and save the sample profile", async () => {
     await page.goto("/");
 
-    await expect(page.getByRole("heading", { name: "Phase 0 Dashboard" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Internship Dashboard" })).toBeVisible();
 
     await goToPrimaryNav(page, "Profile");
     await expect(page).toHaveURL(/\/profile$/);

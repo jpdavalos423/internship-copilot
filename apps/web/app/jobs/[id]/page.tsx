@@ -153,6 +153,43 @@ export default function JobDetailPage() {
         </div>
       ) : null}
 
+      <SectionCard
+        title="Relevance"
+        description="This verdict reflects your recruiting preferences and stays separate from the workflow status."
+      >
+        <div className="grid">
+          <div className="dashboard-job-card__pills">
+            <span className={`relevance-pill relevance-pill--detail relevance-pill--${job.relevance.toLowerCase()}`}>
+              {job.relevance.replaceAll("_", " ")}
+            </span>
+            {job.relevance_score !== null ? <span className="pill">Relevance {job.relevance_score}</span> : null}
+            {job.latest_match_score !== null ? <span className="pill">Match {job.latest_match_score}</span> : null}
+          </div>
+
+          <div>
+            <h3 className="card__title">Why this role is showing up</h3>
+            <ul className="plain-list">
+              {(job.relevance_reasons.length ? job.relevance_reasons : ["Visible for manual review."]).map((reason) => (
+                <li key={reason}>{reason}</li>
+              ))}
+            </ul>
+          </div>
+
+          <div>
+            <h3 className="card__title">Flags</h3>
+            {job.relevance_flags.length ? (
+              <ul className="plain-list">
+                {job.relevance_flags.map((flag) => (
+                  <li key={flag}>{flag}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="muted">No blocking preference flags were detected for this role.</p>
+            )}
+          </div>
+        </div>
+      </SectionCard>
+
       <JobRecruitingEditor
         key={`${job.id}-${job.updated_at}-${job.workflow_status}-${job.applied_date ?? ""}-${job.next_action_due_date ?? ""}`}
         job={job}

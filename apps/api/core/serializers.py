@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from core.models import CandidateProfile, GeneratedAnswer, Job, MatchReport
+from core.models import CandidateProfile, GeneratedAnswer, Job, MatchReport, RecruitingPreferences
 
 
 class JobComputedFieldsSerializerMixin(serializers.ModelSerializer):
@@ -8,6 +8,7 @@ class JobComputedFieldsSerializerMixin(serializers.ModelSerializer):
     latest_recommendation = serializers.CharField(read_only=True, allow_null=True)
     latest_match_report_id = serializers.UUIDField(read_only=True, allow_null=True)
     latest_analysis_created_at = serializers.DateTimeField(read_only=True, allow_null=True)
+    relevance_score = serializers.IntegerField(read_only=True, allow_null=True)
 
 
 class CandidateProfileSerializer(serializers.ModelSerializer):
@@ -15,6 +16,26 @@ class CandidateProfileSerializer(serializers.ModelSerializer):
         model = CandidateProfile
         fields = ["id", "resume_text", "normalized_skills", "created_at", "updated_at"]
         read_only_fields = ["id", "normalized_skills", "created_at", "updated_at"]
+
+
+class RecruitingPreferencesSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RecruitingPreferences
+        fields = [
+            "id",
+            "target_terms",
+            "role_types",
+            "preferred_locations",
+            "remote_preference",
+            "preferred_industries",
+            "excluded_keywords",
+            "minimum_match_score",
+            "include_sponsorship_required_roles",
+            "include_clearance_required_roles",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]
 
 
 class JobCreateSerializer(JobComputedFieldsSerializerMixin):
@@ -42,12 +63,17 @@ class JobCreateSerializer(JobComputedFieldsSerializerMixin):
             "is_saved",
             "normalized_requirements",
             "normalized_preferred",
+            "relevance",
+            "relevance_reasons",
+            "relevance_flags",
+            "relevance_last_evaluated_at",
             "created_at",
             "updated_at",
             "latest_match_score",
             "latest_recommendation",
             "latest_match_report_id",
             "latest_analysis_created_at",
+            "relevance_score",
         ]
         read_only_fields = [
             "id",
@@ -67,12 +93,17 @@ class JobCreateSerializer(JobComputedFieldsSerializerMixin):
             "is_saved",
             "normalized_requirements",
             "normalized_preferred",
+            "relevance",
+            "relevance_reasons",
+            "relevance_flags",
+            "relevance_last_evaluated_at",
             "created_at",
             "updated_at",
             "latest_match_score",
             "latest_recommendation",
             "latest_match_report_id",
             "latest_analysis_created_at",
+            "relevance_score",
         ]
 
 
@@ -104,12 +135,17 @@ class JobListSerializer(JobComputedFieldsSerializerMixin):
             "is_saved",
             "normalized_requirements",
             "normalized_preferred",
+            "relevance",
+            "relevance_reasons",
+            "relevance_flags",
+            "relevance_last_evaluated_at",
             "created_at",
             "updated_at",
             "latest_match_score",
             "latest_recommendation",
             "latest_match_report_id",
             "latest_analysis_created_at",
+            "relevance_score",
         ]
 
 

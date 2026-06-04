@@ -6,6 +6,27 @@ export type CandidateProfile = {
   updated_at: string;
 };
 
+export type RemotePreference = "REMOTE" | "HYBRID" | "ONSITE" | "ANY";
+
+export type RecruitingPreferences = {
+  id: string;
+  target_terms: string[];
+  role_types: string[];
+  preferred_locations: string[];
+  remote_preference: RemotePreference;
+  preferred_industries: string[];
+  excluded_keywords: string[];
+  minimum_match_score: number;
+  include_sponsorship_required_roles: boolean;
+  include_clearance_required_roles: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type SaveRecruitingPreferencesPayload = Omit<RecruitingPreferences, "id" | "created_at" | "updated_at">;
+
+export type JobRelevance = "HIGHLY_RELEVANT" | "RELEVANT" | "REVIEW" | "NOT_RELEVANT";
+
 export type SaveProfilePayload = {
   resume_text: string;
 };
@@ -41,6 +62,11 @@ export type Job = {
   is_saved: boolean;
   normalized_requirements: string[];
   normalized_preferred: string[];
+  relevance: JobRelevance;
+  relevance_reasons: string[];
+  relevance_flags: string[];
+  relevance_last_evaluated_at: string | null;
+  relevance_score: number | null;
   created_at: string;
   updated_at: string;
   latest_match_score: number | null;
@@ -65,12 +91,17 @@ export type JobWorkflowStatus = Job["workflow_status"];
 export type JobSort =
   | "match_score_desc"
   | "match_score_asc"
+  | "newest_first"
   | "updated_at_desc"
   | "created_at_desc"
   | "company_asc";
 
 export type JobsQuery = {
+  view?: "relevant" | "all";
+  relevance?: JobRelevance[];
   status?: JobWorkflowStatus[];
+  hide_not_relevant?: boolean;
+  recently_added?: boolean;
   include_archived?: boolean;
   sort?: JobSort;
 };

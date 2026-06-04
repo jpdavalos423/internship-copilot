@@ -12,6 +12,7 @@ const navigation = [
   { href: "/", label: "Dashboard" },
   { href: "/profile", label: "Profile" },
   { href: "/jobs", label: "Jobs" },
+  { href: "/preferences/recruiting", label: "Preferences" },
 ];
 
 export function AppShell({ children }: AppShellProps) {
@@ -23,7 +24,7 @@ export function AppShell({ children }: AppShellProps) {
         <div className="app-shell__header-inner">
           <div className="app-shell__brand">
             <span className="app-shell__title">Internship Copilot</span>
-            <span className="app-shell__subtitle">Deterministic Phase 0 match analysis</span>
+            <span className="app-shell__subtitle">Personalized internship board for JP</span>
           </div>
 
           <nav className="app-shell__nav" aria-label="Primary navigation">

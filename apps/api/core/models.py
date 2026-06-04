@@ -20,6 +20,32 @@ class CandidateProfile(TimestampedModel):
         ordering = ["-updated_at"]
 
 
+class RecruitingPreferences(TimestampedModel):
+    class RemotePreference(models.TextChoices):
+        REMOTE = "REMOTE", "Remote"
+        HYBRID = "HYBRID", "Hybrid"
+        ONSITE = "ONSITE", "Onsite"
+        ANY = "ANY", "Any"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    target_terms = models.JSONField(default=list, blank=True)
+    role_types = models.JSONField(default=list, blank=True)
+    preferred_locations = models.JSONField(default=list, blank=True)
+    remote_preference = models.CharField(
+        max_length=16,
+        choices=RemotePreference.choices,
+        default=RemotePreference.ANY,
+    )
+    preferred_industries = models.JSONField(default=list, blank=True)
+    excluded_keywords = models.JSONField(default=list, blank=True)
+    minimum_match_score = models.PositiveIntegerField(default=60)
+    include_sponsorship_required_roles = models.BooleanField(default=False)
+    include_clearance_required_roles = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["-updated_at"]
+
+
 class Job(TimestampedModel):
     class WorkflowStatus(models.TextChoices):
         DISCOVERED = "DISCOVERED", "Discovered"
@@ -43,6 +69,12 @@ class Job(TimestampedModel):
         MANUAL = "MANUAL", "Manual"
         INGESTED = "INGESTED", "Ingested"
         FAILED = "FAILED", "Failed"
+
+    class Relevance(models.TextChoices):
+        HIGHLY_RELEVANT = "HIGHLY_RELEVANT", "Highly Relevant"
+        RELEVANT = "RELEVANT", "Relevant"
+        REVIEW = "REVIEW", "Review"
+        NOT_RELEVANT = "NOT_RELEVANT", "Not Relevant"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     company_name = models.CharField(max_length=255)
@@ -77,6 +109,14 @@ class Job(TimestampedModel):
     is_saved = models.BooleanField(default=False)
     normalized_requirements = models.JSONField(default=list, blank=True)
     normalized_preferred = models.JSONField(default=list, blank=True)
+    relevance = models.CharField(
+        max_length=32,
+        choices=Relevance.choices,
+        default=Relevance.REVIEW,
+    )
+    relevance_reasons = models.JSONField(default=list, blank=True)
+    relevance_flags = models.JSONField(default=list, blank=True)
+    relevance_last_evaluated_at = models.DateTimeField(blank=True, null=True)
 
     class Meta:
         ordering = ["-created_at"]

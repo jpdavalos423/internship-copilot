@@ -1,9 +1,10 @@
-from datetime import date
+from datetime import date, timedelta
 from unittest.mock import patch
 
+from django.utils import timezone
 from rest_framework.test import APITestCase
 
-from core.models import CandidateProfile, GeneratedAnswer, Job, MatchReport
+from core.models import CandidateProfile, GeneratedAnswer, Job, MatchReport, RecruitingPreferences
 from core.services.job_ingestion import FetchedDocument
 from core.tests.fixtures import load_sample
 
@@ -75,6 +76,10 @@ class PhaseZeroApiTests(APITestCase):
         assert create_job_response.data["is_archived"] is False
         assert create_job_response.data["is_hidden"] is False
         assert create_job_response.data["is_saved"] is True
+        assert create_job_response.data["relevance"] == "REVIEW"
+        assert create_job_response.data["relevance_reasons"]
+        assert create_job_response.data["relevance_flags"] == ["No target term match detected."]
+        assert create_job_response.data["relevance_score"] == 35
         assert create_job_response.data["latest_match_score"] is None
         assert create_job_response.data["latest_recommendation"] is None
         assert create_job_response.data["latest_match_report_id"] is None
@@ -94,6 +99,7 @@ class PhaseZeroApiTests(APITestCase):
         assert Job.objects.get(id=job_id).source_type == Job.SourceType.MANUAL
         assert Job.objects.get(id=job_id).ingestion_status == Job.IngestionStatus.MANUAL
         assert Job.objects.get(id=job_id).workflow_status == Job.WorkflowStatus.SAVED
+        assert Job.objects.get(id=job_id).relevance == Job.Relevance.RELEVANT
 
     def test_analysis_keeps_history_and_latest_endpoint_returns_newest_report(self):
         self.client.post(
@@ -344,6 +350,89 @@ class GeneratedAnswerApiTests(APITestCase):
 
         assert response.status_code == 500
         assert response.data["error"]["code"] == "ANSWER_GENERATION_FAILED"
+
+
+class RecruitingPreferencesApiTests(APITestCase):
+    def test_preferences_get_creates_default_singleton(self):
+        response = self.client.get("/api/v1/preferences/recruiting")
+
+        assert response.status_code == 200
+        assert response.data["target_terms"] == [
+            "Fall 2026",
+            "Winter 2027",
+            "Spring 2027",
+            "Summer 2027",
+        ]
+        assert response.data["role_types"] == [
+            "Backend",
+            "Full-stack",
+            "Platform",
+            "Infrastructure",
+            "AI/ML",
+        ]
+        assert RecruitingPreferences.objects.count() == 1
+
+    def test_preferences_post_upserts_and_recomputes_job_relevance(self):
+        create_job_response = self.client.post(
+            "/api/v1/jobs",
+            {
+                "company_name": "SecureCo",
+                "title": "Security Clearance Intern",
+                "location": "Onsite",
+                "raw_text": "Summer 2027 backend internship. Security clearance required.",
+            },
+            format="json",
+        )
+        job_id = create_job_response.data["id"]
+
+        response = self.client.post(
+            "/api/v1/preferences/recruiting",
+            {
+                "target_terms": ["Summer 2027"],
+                "role_types": ["Backend", "Systems", "Cloud"],
+                "preferred_locations": ["Onsite"],
+                "remote_preference": "ONSITE",
+                "preferred_industries": [],
+                "excluded_keywords": ["defense"],
+                "minimum_match_score": 50,
+                "include_sponsorship_required_roles": False,
+                "include_clearance_required_roles": True,
+            },
+            format="json",
+        )
+
+        assert response.status_code == 200
+        assert RecruitingPreferences.objects.count() == 1
+        job = Job.objects.get(id=job_id)
+        assert job.relevance == Job.Relevance.REVIEW
+        assert job.relevance_reasons
+
+    def test_jobs_endpoint_supports_relevance_filters_and_recently_added(self):
+        Job.objects.create(
+            company_name="Astranis",
+            title="Backend Intern",
+            location="Remote",
+            raw_text="Summer 2027 backend internship remote",
+            relevance=Job.Relevance.HIGHLY_RELEVANT,
+            relevance_reasons=["Strong backend match."],
+        )
+        older_job = Job.objects.create(
+            company_name="Older Co",
+            title="Data Intern",
+            location="Remote",
+            raw_text="Spring 2027 data internship remote",
+            relevance=Job.Relevance.NOT_RELEVANT,
+            relevance_reasons=["Out of scope."],
+        )
+        Job.objects.filter(id=older_job.id).update(created_at=timezone.now() - timedelta(days=10))
+
+        response = self.client.get(
+            "/api/v1/jobs?view=all&relevance=HIGHLY_RELEVANT&recently_added=true&sort=newest_first"
+        )
+
+        assert response.status_code == 200
+        assert len(response.data) == 1
+        assert response.data[0]["company_name"] == "Astranis"
 
 
 class JobUrlIngestionApiTests(APITestCase):

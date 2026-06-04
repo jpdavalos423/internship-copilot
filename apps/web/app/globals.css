@@ -306,6 +306,38 @@ button {
   font-size: 0.92rem;
 }
 
+.relevance-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.45rem 0.75rem;
+  font-size: 0.84rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.relevance-pill--high,
+.relevance-pill--highly_relevant {
+  background: #e7f7ef;
+  color: var(--success);
+}
+
+.relevance-pill--relevant {
+  background: #eaf3ff;
+  color: var(--accent);
+}
+
+.relevance-pill--review {
+  background: #fff4df;
+  color: var(--warning);
+}
+
+.relevance-pill--muted,
+.relevance-pill--not_relevant {
+  background: #fde7ea;
+  color: var(--danger);
+}
+
 .stats-row {
   display: grid;
   gap: 1rem;
@@ -531,7 +563,7 @@ button {
 .dashboard-toolbar {
   display: grid;
   gap: 1rem;
-  grid-template-columns: 220px 280px minmax(220px, 1fr);
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
   align-items: end;
 }
 
@@ -591,6 +623,16 @@ button {
   margin: 0.25rem 0 0;
 }
 
+.job-card__reasoning {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.job-card__reason {
+  margin: 0;
+  font-weight: 600;
+}
+
 .status-pill {
   display: inline-flex;
   align-items: center;
@@ -627,6 +669,34 @@ button {
   display: grid;
   gap: 1rem;
   grid-template-columns: 1fr 1fr;
+}
+
+.filter-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.filter-chip {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.55rem 0.8rem;
+  background: #fcfdff;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.filter-chip--active {
+  border-color: rgba(15, 108, 189, 0.28);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.plain-list {
+  margin: 0;
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 0.45rem;
 }
 
 .metadata-grid {

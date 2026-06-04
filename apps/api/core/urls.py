@@ -10,10 +10,16 @@ from core.views import (
     JobDetailView,
     JobIngestUrlView,
     JobListCreateView,
+    RecruitingPreferencesView,
 )
 
 urlpatterns = [
     path("profile", CandidateProfileView.as_view(), name="candidate-profile"),
+    path(
+        "preferences/recruiting",
+        RecruitingPreferencesView.as_view(),
+        name="recruiting-preferences",
+    ),
     path("jobs", JobListCreateView.as_view(), name="job-list-create"),
     path("jobs/ingest-url", JobIngestUrlView.as_view(), name="job-ingest-url"),
     path("jobs/<uuid:job_id>", JobDetailView.as_view(), name="job-detail"),

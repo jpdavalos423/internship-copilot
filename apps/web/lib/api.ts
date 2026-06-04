@@ -9,6 +9,8 @@ import type {
   Job,
   JobsQuery,
   MatchReport,
+  RecruitingPreferences,
+  SaveRecruitingPreferencesPayload,
   SaveProfilePayload,
   UpdateJobPayload,
 } from "@/lib/types";
@@ -120,11 +122,38 @@ export function saveProfile(payload: SaveProfilePayload) {
   });
 }
 
+export function getRecruitingPreferences() {
+  return request<RecruitingPreferences>("/preferences/recruiting");
+}
+
+export function saveRecruitingPreferences(payload: SaveRecruitingPreferencesPayload) {
+  return request<RecruitingPreferences>("/preferences/recruiting", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function getJobs(query?: JobsQuery) {
   const search = new URLSearchParams();
 
+  if (query?.view) {
+    search.set("view", query.view);
+  }
+
+  if (query?.relevance?.length) {
+    search.set("relevance", query.relevance.join(","));
+  }
+
   if (query?.status?.length) {
     search.set("status", query.status.join(","));
+  }
+
+  if (query?.hide_not_relevant) {
+    search.set("hide_not_relevant", "true");
+  }
+
+  if (query?.recently_added) {
+    search.set("recently_added", "true");
   }
 
   if (query?.include_archived) {
