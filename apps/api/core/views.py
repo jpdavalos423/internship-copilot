@@ -10,11 +10,13 @@ from core.serializers import (
     GenerateAnswerRequestSerializer,
     JobCreateSerializer,
     JobDetailSerializer,
+    JobIngestUrlSerializer,
     JobListSerializer,
     MatchReportSerializer,
 )
 from core.services.answer_generation import generate_answer_for_match_report
 from core.services.answer_validation import AnswerValidationError
+from core.services.job_ingestion import JobIngestionError, ingest_job_from_url
 from core.services.job_parser import parse_job_text
 from core.services.profile_parser import parse_profile_text
 from core.services.scoring import score_job_fit
@@ -66,6 +68,25 @@ class JobDetailView(APIView):
         if job is None:
             return error_response("Job not found", code="JOB_NOT_FOUND", status_code=404)
         return Response(JobDetailSerializer(job).data)
+
+
+class JobIngestUrlView(APIView):
+    def post(self, request):
+        serializer = JobIngestUrlSerializer(data=request.data)
+        if not serializer.is_valid():
+            return error_response(
+                "Enter a valid http or https job posting URL.",
+                code="INVALID_URL",
+                status_code=400,
+            )
+
+        try:
+            result = ingest_job_from_url(serializer.validated_data["url"])
+        except JobIngestionError as exc:
+            return error_response(exc.message, code=exc.code, status_code=exc.status_code)
+
+        status_code = status.HTTP_201_CREATED if result.created else status.HTTP_200_OK
+        return Response(JobDetailSerializer(result.job).data, status=status_code)
 
 
 class JobAnalyzeView(APIView):

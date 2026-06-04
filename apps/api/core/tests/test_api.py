@@ -3,6 +3,7 @@ from unittest.mock import patch
 from rest_framework.test import APITestCase
 
 from core.models import CandidateProfile, GeneratedAnswer, Job, MatchReport
+from core.services.job_ingestion import FetchedDocument
 from core.tests.fixtures import load_sample
 
 
@@ -332,3 +333,199 @@ class GeneratedAnswerApiTests(APITestCase):
 
         assert response.status_code == 500
         assert response.data["error"]["code"] == "ANSWER_GENERATION_FAILED"
+
+
+class JobUrlIngestionApiTests(APITestCase):
+    def test_ingest_url_creates_greenhouse_job(self):
+        with patch("core.services.job_ingestion.fetch_url_document") as mocked_fetch:
+            mocked_fetch.return_value = FetchedDocument(
+                final_url="https://boards.greenhouse.io/orbitlabs/jobs/gh-12345",
+                html=load_sample("greenhouse_job.html"),
+            )
+
+            response = self.client.post(
+                "/api/v1/jobs/ingest-url",
+                {"url": "https://boards.greenhouse.io/orbitlabs/jobs/gh-12345#fragment"},
+                format="json",
+            )
+
+        assert response.status_code == 201
+        assert response.data["company_name"] == "Orbit Labs"
+        assert response.data["title"] == "Backend Software Engineer Intern"
+        assert response.data["location"] == "San Francisco, CA"
+        assert response.data["source_type"] == "GREENHOUSE"
+        assert response.data["source_url"] == "https://boards.greenhouse.io/orbitlabs/jobs/gh-12345"
+        assert response.data["external_id"] == "gh-12345"
+        assert response.data["content_hash"]
+        assert response.data["ingestion_status"] == "INGESTED"
+        assert "python" in response.data["normalized_requirements"]
+        assert "aws" in response.data["normalized_preferred"]
+
+    def test_ingest_url_creates_generic_job(self):
+        with patch("core.services.job_ingestion.fetch_url_document") as mocked_fetch:
+            mocked_fetch.return_value = FetchedDocument(
+                final_url="https://careers.brightridge.dev/roles/data-engineering-intern",
+                html=load_sample("generic_job.html"),
+            )
+
+            response = self.client.post(
+                "/api/v1/jobs/ingest-url",
+                {"url": "https://careers.brightridge.dev/roles/data-engineering-intern"},
+                format="json",
+            )
+
+        assert response.status_code == 201
+        assert response.data["source_type"] == "OTHER"
+        assert response.data["company_name"] == "Bright Ridge"
+        assert response.data["title"] == "Data Engineering Intern"
+        assert response.data["location"] == "Austin, TX"
+        assert "sql" in response.data["normalized_requirements"]
+        assert "aws" in response.data["normalized_preferred"]
+
+    def test_ingest_url_detects_lever_and_ashby_sources(self):
+        fixtures = [
+            (
+                "https://jobs.lever.co/launchpoint/platform-engineering-intern",
+                "lever_job.html",
+                "LEVER",
+                "Launch Point",
+            ),
+            (
+                "https://jobs.ashbyhq.com/pine-ai/product-security-intern",
+                "ashby_job.html",
+                "ASHBY",
+                "Pine AI",
+            ),
+        ]
+
+        for url, fixture_name, source_type, company_name in fixtures:
+            with self.subTest(url=url):
+                with patch("core.services.job_ingestion.fetch_url_document") as mocked_fetch:
+                    mocked_fetch.return_value = FetchedDocument(
+                        final_url=url,
+                        html=load_sample(fixture_name),
+                    )
+
+                    response = self.client.post("/api/v1/jobs/ingest-url", {"url": url}, format="json")
+
+                assert response.status_code == 201
+                assert response.data["source_type"] == source_type
+                assert response.data["company_name"] == company_name
+
+    def test_ingest_url_returns_existing_job_for_duplicate_source_url(self):
+        existing_job = Job.objects.create(
+            company_name="Orbit Labs",
+            title="Backend Software Engineer Intern",
+            location="San Francisco, CA",
+            raw_text="Requirements\nPython",
+            source_type=Job.SourceType.GREENHOUSE,
+            source_url="https://boards.greenhouse.io/orbitlabs/jobs/gh-12345",
+            external_id="gh-12345",
+            content_hash="existing-hash",
+            ingestion_status=Job.IngestionStatus.INGESTED,
+            normalized_requirements=["python"],
+            normalized_preferred=[],
+        )
+
+        with patch("core.services.job_ingestion.fetch_url_document") as mocked_fetch:
+            response = self.client.post(
+                "/api/v1/jobs/ingest-url",
+                {"url": "https://boards.greenhouse.io/orbitlabs/jobs/gh-12345"},
+                format="json",
+            )
+
+        assert response.status_code == 200
+        assert response.data["id"] == str(existing_job.id)
+        assert Job.objects.count() == 1
+        mocked_fetch.assert_not_called()
+
+    def test_ingest_url_returns_existing_job_for_duplicate_content_hash(self):
+        with patch("core.services.job_ingestion.fetch_url_document") as mocked_fetch:
+            mocked_fetch.return_value = FetchedDocument(
+                final_url="https://careers.brightridge.dev/roles/data-engineering-intern",
+                html=load_sample("generic_job.html"),
+            )
+            created_response = self.client.post(
+                "/api/v1/jobs/ingest-url",
+                {"url": "https://careers.brightridge.dev/roles/data-engineering-intern"},
+                format="json",
+            )
+
+        with patch("core.services.job_ingestion.fetch_url_document") as mocked_fetch:
+            mocked_fetch.return_value = FetchedDocument(
+                final_url="https://jobs.example.com/listings/data-intern",
+                html=load_sample("generic_job.html"),
+            )
+            duplicate_response = self.client.post(
+                "/api/v1/jobs/ingest-url",
+                {"url": "https://jobs.example.com/listings/data-intern"},
+                format="json",
+            )
+
+        assert created_response.status_code == 201
+        assert duplicate_response.status_code == 200
+        assert duplicate_response.data["id"] == created_response.data["id"]
+        assert Job.objects.count() == 1
+
+    def test_ingest_url_returns_structured_invalid_url_error(self):
+        response = self.client.post("/api/v1/jobs/ingest-url", {"url": "not-a-url"}, format="json")
+
+        assert response.status_code == 400
+        assert response.data["error"]["code"] == "INVALID_URL"
+
+    def test_ingest_url_returns_fetch_error(self):
+        with patch("core.services.job_ingestion.fetch_url_document") as mocked_fetch:
+            from core.services.job_ingestion import JobIngestionError
+
+            mocked_fetch.side_effect = JobIngestionError(
+                "Failed to fetch the job posting URL.",
+                code="JOB_FETCH_FAILED",
+                status_code=502,
+            )
+            response = self.client.post(
+                "/api/v1/jobs/ingest-url",
+                {"url": "https://jobs.lever.co/launchpoint/platform-engineering-intern"},
+                format="json",
+            )
+
+        assert response.status_code == 502
+        assert response.data["error"]["code"] == "JOB_FETCH_FAILED"
+
+    def test_ingest_url_returns_extraction_failed_error(self):
+        html = """
+        <html>
+          <head><title>Unstructured Listing</title></head>
+          <body><main class="job-posting"><p>Requirements</p><p>Python</p></main></body>
+        </html>
+        """
+
+        with patch("core.services.job_ingestion.fetch_url_document") as mocked_fetch:
+            mocked_fetch.return_value = FetchedDocument(
+                final_url="https://jobs.example.com/listings/unstructured",
+                html=html,
+            )
+
+            response = self.client.post(
+                "/api/v1/jobs/ingest-url",
+                {"url": "https://jobs.example.com/listings/unstructured"},
+                format="json",
+            )
+
+        assert response.status_code == 422
+        assert response.data["error"]["code"] == "JOB_EXTRACTION_FAILED"
+
+    def test_ingest_url_returns_empty_extraction_error(self):
+        with patch("core.services.job_ingestion.fetch_url_document") as mocked_fetch:
+            mocked_fetch.return_value = FetchedDocument(
+                final_url="https://jobs.example.com/listings/empty",
+                html=load_sample("empty_job.html"),
+            )
+
+            response = self.client.post(
+                "/api/v1/jobs/ingest-url",
+                {"url": "https://jobs.example.com/listings/empty"},
+                format="json",
+            )
+
+        assert response.status_code == 422
+        assert response.data["error"]["code"] == "JOB_EXTRACTION_EMPTY"

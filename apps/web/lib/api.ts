@@ -5,6 +5,7 @@ import type {
   GenerateAnswerPayload,
   GeneratedAnswer,
   GeneratedAnswersResponse,
+  IngestJobUrlPayload,
   Job,
   MatchReport,
   SaveProfilePayload,
@@ -29,7 +30,7 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function executeRequest(path: string, init?: RequestInit): Promise<Response> {
   let response: Response;
   const headers = new Headers(init?.headers ?? {});
 
@@ -47,6 +48,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error("Unable to reach the API. Make sure the Django server is running and the API base URL is correct.");
   }
 
+  return response;
+}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await executeRequest(path, init);
+
   if (!response.ok) {
     let errorMessage = `Request failed with status ${response.status}.`;
     let errorCode: string | undefined;
@@ -63,6 +70,30 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   return (await response.json()) as T;
+}
+
+async function requestWithMeta<T>(path: string, init?: RequestInit): Promise<{ data: T; status: number }> {
+  const response = await executeRequest(path, init);
+
+  if (!response.ok) {
+    let errorMessage = `Request failed with status ${response.status}.`;
+    let errorCode: string | undefined;
+
+    try {
+      const payload = (await response.json()) as ApiErrorPayload;
+      errorCode = payload.error?.code;
+      if (payload.error?.message) {
+        errorMessage = payload.error.message;
+      }
+    } catch {}
+
+    throw new ApiError(errorMessage, response.status, errorCode);
+  }
+
+  return {
+    data: (await response.json()) as T,
+    status: response.status,
+  };
 }
 
 export function getProfile() {
@@ -96,6 +127,18 @@ export function createJob(payload: CreateJobPayload) {
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export async function ingestJobUrl(payload: IngestJobUrlPayload) {
+  const response = await requestWithMeta<Job>("/jobs/ingest-url", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+  return {
+    job: response.data,
+    created: response.status === 201,
+  };
 }
 
 export function getJob(jobId: string) {

@@ -51,6 +51,10 @@ class JobCreateSerializer(serializers.ModelSerializer):
         ]
 
 
+class JobIngestUrlSerializer(serializers.Serializer):
+    url = serializers.URLField()
+
+
 class JobListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Job

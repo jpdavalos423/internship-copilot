@@ -38,6 +38,10 @@ export type CreateJobPayload = {
   raw_text: string;
 };
 
+export type IngestJobUrlPayload = {
+  url: string;
+};
+
 export type MatchReport = {
   id: string;
   match_report_id: string;

@@ -13,10 +13,8 @@ export default function JobDetailPage() {
   const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
   const jobId = params.id;
-  const createdMessage =
-    searchParams.get("created") === "1"
-      ? "Job created successfully. Review the parsed skills below, then run analysis."
-      : null;
+  const createdMessage = searchParams.get("created") === "1";
+  const duplicateMessage = searchParams.get("duplicate") === "1";
 
   const [job, setJob] = useState<Job | null>(null);
   const [analysis, setAnalysis] = useState<MatchReport | null>(null);
@@ -26,6 +24,11 @@ export default function JobDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const loadedJobIdRef = useRef<string | null>(null);
+  const bannerMessage = createdMessage
+    ? "Job created successfully. Review the parsed skills below, then run analysis."
+    : duplicateMessage
+      ? "This job was already saved, so the existing record was opened."
+      : success;
 
   async function loadJobAndAnalysis() {
     try {
@@ -117,7 +120,7 @@ export default function JobDetailPage() {
         }
       />
 
-      {createdMessage || success ? <div className="success-banner">{createdMessage ?? success}</div> : null}
+      {bannerMessage ? <div className="success-banner">{bannerMessage}</div> : null}
       {analysisError ? <div className="error-banner">{analysisError}</div> : null}
       {!analysis && !analysisError ? (
         <div className="info-banner">
@@ -128,6 +131,30 @@ export default function JobDetailPage() {
       <div className="split-panel">
         <SectionCard title="Job Metadata" description="Normalized skills are parsed and persisted by the Django backend.">
           <div className="grid">
+            <div className="metadata-grid">
+              <div>
+                <h3 className="card__title">Source</h3>
+                <p className="muted">{job.source_type}</p>
+              </div>
+              <div>
+                <h3 className="card__title">Ingestion Status</h3>
+                <p className="muted">{job.ingestion_status}</p>
+              </div>
+              <div>
+                <h3 className="card__title">External ID</h3>
+                <p className="muted">{job.external_id ?? "Not available"}</p>
+              </div>
+              <div>
+                <h3 className="card__title">Source URL</h3>
+                {job.source_url ? (
+                  <a className="link link--inline" href={job.source_url} rel="noreferrer" target="_blank">
+                    {job.source_url}
+                  </a>
+                ) : (
+                  <p className="muted">Manual entry</p>
+                )}
+              </div>
+            </div>
             <div>
               <h3 className="card__title">Required Skills</h3>
               <div className="pill-list">

@@ -194,6 +194,30 @@ button {
   gap: 1rem;
 }
 
+.segmented-control {
+  display: inline-flex;
+  gap: 0.5rem;
+  padding: 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface-muted);
+}
+
+.segmented-control__button {
+  border: 0;
+  border-radius: 12px;
+  padding: 0.7rem 0.95rem;
+  background: transparent;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.segmented-control__button--active {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 4px 14px rgba(23, 32, 51, 0.08);
+}
+
 .form__row {
   display: grid;
   gap: 1rem;
@@ -504,6 +528,20 @@ button {
   grid-template-columns: 1fr 1fr;
 }
 
+.metadata-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.link {
+  color: var(--accent);
+}
+
+.link--inline {
+  word-break: break-word;
+}
+
 pre.raw-text {
   margin: 0;
   white-space: pre-wrap;
@@ -517,6 +555,7 @@ pre.raw-text {
   .grid--two,
   .grid--three,
   .analysis-grid,
+  .metadata-grid,
   .split-panel,
   .form__row,
   .stats-row {
