@@ -22,6 +22,20 @@ export type Job = {
   content_hash: string | null;
   last_seen_at: string | null;
   ingestion_status: "MANUAL" | "INGESTED" | "FAILED";
+  workflow_status:
+    | "DISCOVERED"
+    | "SAVED"
+    | "APPLIED"
+    | "OA"
+    | "INTERVIEW"
+    | "FINAL_ROUND"
+    | "OFFER"
+    | "REJECTED"
+    | "WITHDRAWN";
+  applied_date: string | null;
+  notes: string;
+  next_action: string;
+  next_action_due_date: string | null;
   is_archived: boolean;
   is_hidden: boolean;
   is_saved: boolean;
@@ -29,6 +43,10 @@ export type Job = {
   normalized_preferred: string[];
   created_at: string;
   updated_at: string;
+  latest_match_score: number | null;
+  latest_recommendation: string | null;
+  latest_match_report_id: string | null;
+  latest_analysis_created_at: string | null;
 };
 
 export type CreateJobPayload = {
@@ -41,6 +59,25 @@ export type CreateJobPayload = {
 export type IngestJobUrlPayload = {
   url: string;
 };
+
+export type JobWorkflowStatus = Job["workflow_status"];
+
+export type JobSort =
+  | "match_score_desc"
+  | "match_score_asc"
+  | "updated_at_desc"
+  | "created_at_desc"
+  | "company_asc";
+
+export type JobsQuery = {
+  status?: JobWorkflowStatus[];
+  include_archived?: boolean;
+  sort?: JobSort;
+};
+
+export type UpdateJobPayload = Partial<
+  Pick<Job, "workflow_status" | "applied_date" | "notes" | "next_action" | "next_action_due_date" | "is_archived">
+>;
 
 export type MatchReport = {
   id: string;

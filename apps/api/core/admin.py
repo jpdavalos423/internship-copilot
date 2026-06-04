@@ -10,8 +10,9 @@ class CandidateProfileAdmin(admin.ModelAdmin):
 
 @admin.register(Job)
 class JobAdmin(admin.ModelAdmin):
-    list_display = ("company_name", "title", "created_at")
-    search_fields = ("company_name", "title")
+    list_display = ("company_name", "title", "workflow_status", "applied_date", "is_archived", "created_at")
+    list_filter = ("workflow_status", "source_type", "is_archived")
+    search_fields = ("company_name", "title", "next_action", "notes")
 
 
 @admin.register(MatchReport)

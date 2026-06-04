@@ -21,6 +21,17 @@ class CandidateProfile(TimestampedModel):
 
 
 class Job(TimestampedModel):
+    class WorkflowStatus(models.TextChoices):
+        DISCOVERED = "DISCOVERED", "Discovered"
+        SAVED = "SAVED", "Saved"
+        APPLIED = "APPLIED", "Applied"
+        OA = "OA", "OA"
+        INTERVIEW = "INTERVIEW", "Interview"
+        FINAL_ROUND = "FINAL_ROUND", "Final Round"
+        OFFER = "OFFER", "Offer"
+        REJECTED = "REJECTED", "Rejected"
+        WITHDRAWN = "WITHDRAWN", "Withdrawn"
+
     class SourceType(models.TextChoices):
         MANUAL = "MANUAL", "Manual"
         GREENHOUSE = "GREENHOUSE", "Greenhouse"
@@ -52,6 +63,15 @@ class Job(TimestampedModel):
         choices=IngestionStatus.choices,
         default=IngestionStatus.MANUAL,
     )
+    workflow_status = models.CharField(
+        max_length=32,
+        choices=WorkflowStatus.choices,
+        default=WorkflowStatus.DISCOVERED,
+    )
+    applied_date = models.DateField(blank=True, null=True)
+    notes = models.TextField(blank=True, default="")
+    next_action = models.CharField(max_length=255, blank=True, default="")
+    next_action_due_date = models.DateField(blank=True, null=True)
     is_archived = models.BooleanField(default=False)
     is_hidden = models.BooleanField(default=False)
     is_saved = models.BooleanField(default=False)

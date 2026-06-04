@@ -7,8 +7,10 @@ import type {
   GeneratedAnswersResponse,
   IngestJobUrlPayload,
   Job,
+  JobsQuery,
   MatchReport,
   SaveProfilePayload,
+  UpdateJobPayload,
 } from "@/lib/types";
 
 type ApiErrorPayload = {
@@ -118,8 +120,23 @@ export function saveProfile(payload: SaveProfilePayload) {
   });
 }
 
-export function getJobs() {
-  return request<Job[]>("/jobs");
+export function getJobs(query?: JobsQuery) {
+  const search = new URLSearchParams();
+
+  if (query?.status?.length) {
+    search.set("status", query.status.join(","));
+  }
+
+  if (query?.include_archived) {
+    search.set("include_archived", "true");
+  }
+
+  if (query?.sort) {
+    search.set("sort", query.sort);
+  }
+
+  const suffix = search.size ? `?${search.toString()}` : "";
+  return request<Job[]>(`/jobs${suffix}`);
 }
 
 export function createJob(payload: CreateJobPayload) {
@@ -143,6 +160,13 @@ export async function ingestJobUrl(payload: IngestJobUrlPayload) {
 
 export function getJob(jobId: string) {
   return request<Job>(`/jobs/${jobId}`);
+}
+
+export function updateJob(jobId: string, payload: UpdateJobPayload) {
+  return request<Job>(`/jobs/${jobId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
 }
 
 export function analyzeJob(jobId: string) {

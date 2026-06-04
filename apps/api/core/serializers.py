@@ -3,6 +3,13 @@ from rest_framework import serializers
 from core.models import CandidateProfile, GeneratedAnswer, Job, MatchReport
 
 
+class JobComputedFieldsSerializerMixin(serializers.ModelSerializer):
+    latest_match_score = serializers.IntegerField(read_only=True, allow_null=True)
+    latest_recommendation = serializers.CharField(read_only=True, allow_null=True)
+    latest_match_report_id = serializers.UUIDField(read_only=True, allow_null=True)
+    latest_analysis_created_at = serializers.DateTimeField(read_only=True, allow_null=True)
+
+
 class CandidateProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = CandidateProfile
@@ -10,7 +17,7 @@ class CandidateProfileSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "normalized_skills", "created_at", "updated_at"]
 
 
-class JobCreateSerializer(serializers.ModelSerializer):
+class JobCreateSerializer(JobComputedFieldsSerializerMixin):
     class Meta:
         model = Job
         fields = [
@@ -25,6 +32,11 @@ class JobCreateSerializer(serializers.ModelSerializer):
             "content_hash",
             "last_seen_at",
             "ingestion_status",
+            "workflow_status",
+            "applied_date",
+            "notes",
+            "next_action",
+            "next_action_due_date",
             "is_archived",
             "is_hidden",
             "is_saved",
@@ -32,6 +44,10 @@ class JobCreateSerializer(serializers.ModelSerializer):
             "normalized_preferred",
             "created_at",
             "updated_at",
+            "latest_match_score",
+            "latest_recommendation",
+            "latest_match_report_id",
+            "latest_analysis_created_at",
         ]
         read_only_fields = [
             "id",
@@ -41,6 +57,11 @@ class JobCreateSerializer(serializers.ModelSerializer):
             "content_hash",
             "last_seen_at",
             "ingestion_status",
+            "workflow_status",
+            "applied_date",
+            "notes",
+            "next_action",
+            "next_action_due_date",
             "is_archived",
             "is_hidden",
             "is_saved",
@@ -48,6 +69,10 @@ class JobCreateSerializer(serializers.ModelSerializer):
             "normalized_preferred",
             "created_at",
             "updated_at",
+            "latest_match_score",
+            "latest_recommendation",
+            "latest_match_report_id",
+            "latest_analysis_created_at",
         ]
 
 
@@ -55,7 +80,7 @@ class JobIngestUrlSerializer(serializers.Serializer):
     url = serializers.URLField()
 
 
-class JobListSerializer(serializers.ModelSerializer):
+class JobListSerializer(JobComputedFieldsSerializerMixin):
     class Meta:
         model = Job
         fields = [
@@ -69,6 +94,11 @@ class JobListSerializer(serializers.ModelSerializer):
             "content_hash",
             "last_seen_at",
             "ingestion_status",
+            "workflow_status",
+            "applied_date",
+            "notes",
+            "next_action",
+            "next_action_due_date",
             "is_archived",
             "is_hidden",
             "is_saved",
@@ -76,12 +106,29 @@ class JobListSerializer(serializers.ModelSerializer):
             "normalized_preferred",
             "created_at",
             "updated_at",
+            "latest_match_score",
+            "latest_recommendation",
+            "latest_match_report_id",
+            "latest_analysis_created_at",
         ]
 
 
 class JobDetailSerializer(JobListSerializer):
     class Meta(JobListSerializer.Meta):
         fields = JobListSerializer.Meta.fields + ["raw_text"]
+
+
+class JobUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Job
+        fields = [
+            "workflow_status",
+            "applied_date",
+            "notes",
+            "next_action",
+            "next_action_due_date",
+            "is_archived",
+        ]
 
 
 class MatchReportSerializer(serializers.ModelSerializer):

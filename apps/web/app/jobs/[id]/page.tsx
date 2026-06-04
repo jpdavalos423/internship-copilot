@@ -4,9 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { AnalysisPanel } from "@/components/analysis-panel";
 import { ApplicationAnswersPanel } from "@/components/application-answers-panel";
+import { JobRecruitingEditor } from "@/components/job-recruiting-editor";
 import { PageHeader } from "@/components/page-header";
 import { SectionCard } from "@/components/section-card";
-import { analyzeJob, getJob, getLatestJobAnalysis } from "@/lib/api";
+import { analyzeJob, getJob, getLatestJobAnalysis, updateJob } from "@/lib/api";
 import type { Job, MatchReport } from "@/lib/types";
 
 export default function JobDetailPage() {
@@ -85,6 +86,18 @@ export default function JobDetailPage() {
     }
   }
 
+  async function handleQuickStatusUpdate(workflowStatus: Job["workflow_status"], message: string) {
+    try {
+      setAnalysisError(null);
+      setSuccess(null);
+      const updatedJob = await updateJob(jobId, { workflow_status: workflowStatus });
+      setJob(updatedJob);
+      setSuccess(message);
+    } catch (updateError) {
+      setAnalysisError(updateError instanceof Error ? updateError.message : "Failed to update job.");
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="grid">
@@ -114,9 +127,21 @@ export default function JobDetailPage() {
         title={job.title}
         description={`${job.company_name} • ${job.location || "Location not provided"}`}
         actions={
-          <button className="button" disabled={isAnalyzing} onClick={handleAnalyze} type="button">
-            {isAnalyzing ? "Running Analysis..." : "Run Analysis"}
-          </button>
+          <>
+            <button className="button button--secondary" onClick={() => void handleQuickStatusUpdate("SAVED", "Job saved.")} type="button">
+              Save Job
+            </button>
+            <button
+              className="button button--secondary"
+              onClick={() => void handleQuickStatusUpdate("INTERVIEW", "Marked as interview.")}
+              type="button"
+            >
+              Mark Interview
+            </button>
+            <button className="button" disabled={isAnalyzing} onClick={handleAnalyze} type="button">
+              {isAnalyzing ? "Running Analysis..." : "Run Analysis"}
+            </button>
+          </>
         }
       />
 
@@ -128,10 +153,23 @@ export default function JobDetailPage() {
         </div>
       ) : null}
 
+      <JobRecruitingEditor
+        key={`${job.id}-${job.updated_at}-${job.workflow_status}-${job.applied_date ?? ""}-${job.next_action_due_date ?? ""}`}
+        job={job}
+        onJobUpdated={(updatedJob, message) => {
+          setJob(updatedJob);
+          setSuccess(message);
+        }}
+      />
+
       <div className="split-panel">
         <SectionCard title="Job Metadata" description="Normalized skills are parsed and persisted by the Django backend.">
           <div className="grid">
             <div className="metadata-grid">
+              <div>
+                <h3 className="card__title">Workflow Status</h3>
+                <p className="muted">{job.workflow_status}</p>
+              </div>
               <div>
                 <h3 className="card__title">Source</h3>
                 <p className="muted">{job.source_type}</p>
@@ -139,6 +177,10 @@ export default function JobDetailPage() {
               <div>
                 <h3 className="card__title">Ingestion Status</h3>
                 <p className="muted">{job.ingestion_status}</p>
+              </div>
+              <div>
+                <h3 className="card__title">Applied Date</h3>
+                <p className="muted">{job.applied_date ?? "Not applied yet"}</p>
               </div>
               <div>
                 <h3 className="card__title">External ID</h3>
@@ -153,6 +195,16 @@ export default function JobDetailPage() {
                 ) : (
                   <p className="muted">Manual entry</p>
                 )}
+              </div>
+            </div>
+            <div className="metadata-grid">
+              <div>
+                <h3 className="card__title">Next Action</h3>
+                <p className="muted">{job.next_action || "No next action set"}</p>
+              </div>
+              <div>
+                <h3 className="card__title">Due Date</h3>
+                <p className="muted">{job.next_action_due_date ?? "No due date set"}</p>
               </div>
             </div>
             <div>
@@ -182,6 +234,10 @@ export default function JobDetailPage() {
                   <span className="muted">No parsed preferred skills.</span>
                 )}
               </div>
+            </div>
+            <div>
+              <h3 className="card__title">Notes</h3>
+              <p className="muted">{job.notes || "No notes saved yet."}</p>
             </div>
           </div>
         </SectionCard>

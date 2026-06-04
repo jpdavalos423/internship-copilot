@@ -1,3 +1,4 @@
+from datetime import date
 from unittest.mock import patch
 
 from rest_framework.test import APITestCase
@@ -66,9 +67,18 @@ class PhaseZeroApiTests(APITestCase):
         assert create_job_response.data["external_id"] is None
         assert create_job_response.data["content_hash"] is None
         assert create_job_response.data["last_seen_at"] is None
+        assert create_job_response.data["workflow_status"] == "SAVED"
+        assert create_job_response.data["applied_date"] is None
+        assert create_job_response.data["notes"] == ""
+        assert create_job_response.data["next_action"] == ""
+        assert create_job_response.data["next_action_due_date"] is None
         assert create_job_response.data["is_archived"] is False
         assert create_job_response.data["is_hidden"] is False
-        assert create_job_response.data["is_saved"] is False
+        assert create_job_response.data["is_saved"] is True
+        assert create_job_response.data["latest_match_score"] is None
+        assert create_job_response.data["latest_recommendation"] is None
+        assert create_job_response.data["latest_match_report_id"] is None
+        assert create_job_response.data["latest_analysis_created_at"] is None
         assert analyze_response.data["match_score"] == 90
         assert analyze_response.data["match_report_id"] == analyze_response.data["id"]
         assert analysis_response.data["match_report_id"] == analyze_response.data["match_report_id"]
@@ -83,6 +93,7 @@ class PhaseZeroApiTests(APITestCase):
         assert MatchReport.objects.count() == 1
         assert Job.objects.get(id=job_id).source_type == Job.SourceType.MANUAL
         assert Job.objects.get(id=job_id).ingestion_status == Job.IngestionStatus.MANUAL
+        assert Job.objects.get(id=job_id).workflow_status == Job.WorkflowStatus.SAVED
 
     def test_analysis_keeps_history_and_latest_endpoint_returns_newest_report(self):
         self.client.post(
@@ -358,6 +369,8 @@ class JobUrlIngestionApiTests(APITestCase):
         assert response.data["external_id"] == "gh-12345"
         assert response.data["content_hash"]
         assert response.data["ingestion_status"] == "INGESTED"
+        assert response.data["workflow_status"] == "DISCOVERED"
+        assert response.data["is_saved"] is False
         assert "python" in response.data["normalized_requirements"]
         assert "aws" in response.data["normalized_preferred"]
 
@@ -529,3 +542,160 @@ class JobUrlIngestionApiTests(APITestCase):
 
         assert response.status_code == 422
         assert response.data["error"]["code"] == "JOB_EXTRACTION_EMPTY"
+
+
+class RecruitingDashboardApiTests(APITestCase):
+    def setUp(self):
+        self.manual_job = Job.objects.create(
+            company_name="Astranis",
+            title="Backend Intern",
+            location="San Francisco, CA",
+            raw_text=load_sample("sample_job_backend.txt"),
+            source_type=Job.SourceType.MANUAL,
+            ingestion_status=Job.IngestionStatus.MANUAL,
+            workflow_status=Job.WorkflowStatus.SAVED,
+            is_saved=True,
+            normalized_requirements=["python"],
+            normalized_preferred=[],
+        )
+        self.discovered_job = Job.objects.create(
+            company_name="Orbit Labs",
+            title="Platform Intern",
+            location="Remote",
+            raw_text=load_sample("sample_job_backend.txt"),
+            source_type=Job.SourceType.GREENHOUSE,
+            source_url="https://boards.greenhouse.io/orbitlabs/jobs/gh-12345",
+            ingestion_status=Job.IngestionStatus.INGESTED,
+            workflow_status=Job.WorkflowStatus.DISCOVERED,
+            is_saved=False,
+            normalized_requirements=["python"],
+            normalized_preferred=[],
+        )
+        self.archived_job = Job.objects.create(
+            company_name="Pine AI",
+            title="Security Intern",
+            location="New York, NY",
+            raw_text=load_sample("sample_job_backend.txt"),
+            source_type=Job.SourceType.ASHBY,
+            ingestion_status=Job.IngestionStatus.INGESTED,
+            workflow_status=Job.WorkflowStatus.REJECTED,
+            is_saved=True,
+            is_archived=True,
+            normalized_requirements=["python"],
+            normalized_preferred=[],
+        )
+
+        profile = CandidateProfile.objects.create(
+            resume_text=load_sample("sample_resume.txt"),
+            normalized_skills=["python", "django"],
+        )
+        MatchReport.objects.create(
+            job=self.manual_job,
+            candidate_profile=profile,
+            match_score=90,
+            recommendation="HIGH_PRIORITY_APPLY",
+            strengths=["Strong backend fit"],
+            gaps=[],
+            missing_keywords=[],
+            matched_skills_by_category={"languages": ["python"]},
+            missing_skills_by_category={},
+            reasoning="Good fit",
+            score_breakdown={"total": 90},
+        )
+        MatchReport.objects.create(
+            job=self.discovered_job,
+            candidate_profile=profile,
+            match_score=65,
+            recommendation="REVIEW",
+            strengths=["Relevant experience"],
+            gaps=["distributed systems"],
+            missing_keywords=["distributed systems"],
+            matched_skills_by_category={"languages": ["python"]},
+            missing_skills_by_category={"systems": ["distributed systems"]},
+            reasoning="Needs review",
+            score_breakdown={"total": 65},
+        )
+
+    def test_jobs_list_returns_latest_match_summary_fields(self):
+        response = self.client.get("/api/v1/jobs")
+
+        assert response.status_code == 200
+        assert len(response.data) == 2
+        manual_job = next(item for item in response.data if item["id"] == str(self.manual_job.id))
+        assert manual_job["latest_match_score"] == 90
+        assert manual_job["latest_recommendation"] == "HIGH_PRIORITY_APPLY"
+        assert manual_job["latest_match_report_id"] is not None
+        assert manual_job["latest_analysis_created_at"] is not None
+
+    def test_jobs_list_filters_by_status(self):
+        response = self.client.get("/api/v1/jobs?status=DISCOVERED")
+
+        assert response.status_code == 200
+        assert [item["id"] for item in response.data] == [str(self.discovered_job.id)]
+
+    def test_jobs_list_hides_archived_by_default_and_can_include_them(self):
+        default_response = self.client.get("/api/v1/jobs")
+        archived_response = self.client.get("/api/v1/jobs?include_archived=true")
+
+        assert default_response.status_code == 200
+        assert str(self.archived_job.id) not in {item["id"] for item in default_response.data}
+        assert archived_response.status_code == 200
+        assert str(self.archived_job.id) in {item["id"] for item in archived_response.data}
+
+    def test_jobs_list_sorts_by_match_score_desc_by_default(self):
+        response = self.client.get("/api/v1/jobs")
+
+        assert response.status_code == 200
+        assert [item["id"] for item in response.data] == [
+            str(self.manual_job.id),
+            str(self.discovered_job.id),
+        ]
+
+    def test_jobs_list_sorts_by_match_score_asc(self):
+        response = self.client.get("/api/v1/jobs?sort=match_score_asc")
+
+        assert response.status_code == 200
+        assert [item["id"] for item in response.data] == [
+            str(self.discovered_job.id),
+            str(self.manual_job.id),
+        ]
+
+    def test_patch_job_updates_recruiting_fields(self):
+        response = self.client.patch(
+            f"/api/v1/jobs/{self.discovered_job.id}",
+            {
+                "workflow_status": "INTERVIEW",
+                "notes": "Recruiter screen went well.",
+                "next_action": "Prepare for technical interview",
+                "next_action_due_date": "2026-06-10",
+            },
+            format="json",
+        )
+
+        assert response.status_code == 200
+        assert response.data["workflow_status"] == "INTERVIEW"
+        assert response.data["notes"] == "Recruiter screen went well."
+        assert response.data["next_action"] == "Prepare for technical interview"
+        assert response.data["next_action_due_date"] == "2026-06-10"
+        assert response.data["is_saved"] is True
+
+    def test_patch_job_sets_applied_date_when_marked_applied(self):
+        response = self.client.patch(
+            f"/api/v1/jobs/{self.discovered_job.id}",
+            {"workflow_status": "APPLIED"},
+            format="json",
+        )
+
+        assert response.status_code == 200
+        assert response.data["workflow_status"] == "APPLIED"
+        assert response.data["applied_date"] == date.today().isoformat()
+
+    def test_patch_job_can_archive_record(self):
+        response = self.client.patch(
+            f"/api/v1/jobs/{self.manual_job.id}",
+            {"is_archived": True},
+            format="json",
+        )
+
+        assert response.status_code == 200
+        assert response.data["is_archived"] is True

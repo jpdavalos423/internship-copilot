@@ -12,6 +12,11 @@ const mockJob = {
   content_hash: "abc123",
   last_seen_at: "2026-06-04T20:30:00Z",
   ingestion_status: "INGESTED",
+  workflow_status: "DISCOVERED",
+  applied_date: null,
+  notes: "",
+  next_action: "",
+  next_action_due_date: null,
   is_archived: false,
   is_hidden: false,
   is_saved: false,
@@ -19,6 +24,10 @@ const mockJob = {
   normalized_preferred: ["aws"],
   created_at: "2026-06-04T20:30:00Z",
   updated_at: "2026-06-04T20:30:00Z",
+  latest_match_score: null,
+  latest_recommendation: null,
+  latest_match_report_id: null,
+  latest_analysis_created_at: null,
 };
 
 async function mockJobDetailRoutes(page: Page) {

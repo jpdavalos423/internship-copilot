@@ -1,3 +1,5 @@
+from django.db.models import F, OuterRef, Subquery
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -12,6 +14,7 @@ from core.serializers import (
     JobDetailSerializer,
     JobIngestUrlSerializer,
     JobListSerializer,
+    JobUpdateSerializer,
     MatchReportSerializer,
 )
 from core.services.answer_generation import generate_answer_for_match_report
@@ -24,6 +27,48 @@ from core.services.scoring import score_job_fit
 
 def error_response(message: str, *, code: str, status_code: int) -> Response:
     return Response({"error": {"code": code, "message": message}}, status=status_code)
+
+
+def annotate_jobs_with_latest_match(job_queryset):
+    latest_reports = MatchReport.objects.filter(job_id=OuterRef("pk")).order_by("-created_at")
+    return job_queryset.annotate(
+        latest_match_score=Subquery(latest_reports.values("match_score")[:1]),
+        latest_recommendation=Subquery(latest_reports.values("recommendation")[:1]),
+        latest_match_report_id=Subquery(latest_reports.values("id")[:1]),
+        latest_analysis_created_at=Subquery(latest_reports.values("created_at")[:1]),
+    )
+
+
+def get_is_saved_for_workflow_status(workflow_status: str) -> bool:
+    return workflow_status != Job.WorkflowStatus.DISCOVERED
+
+
+def apply_job_filters(job_queryset, request):
+    include_archived = request.query_params.get("include_archived", "false").lower() == "true"
+    if not include_archived:
+        job_queryset = job_queryset.filter(is_archived=False)
+
+    status_filter = request.query_params.get("status")
+    if status_filter:
+        statuses = [item.strip().upper() for item in status_filter.split(",") if item.strip()]
+        valid_statuses = {choice for choice, _label in Job.WorkflowStatus.choices}
+        selected_statuses = [item for item in statuses if item in valid_statuses]
+        if selected_statuses:
+            job_queryset = job_queryset.filter(workflow_status__in=selected_statuses)
+
+    return job_queryset
+
+
+def apply_job_sorting(job_queryset, request):
+    sort = request.query_params.get("sort", "match_score_desc")
+    sort_mapping = {
+        "match_score_desc": (F("latest_match_score").desc(nulls_last=True), F("updated_at").desc()),
+        "match_score_asc": (F("latest_match_score").asc(nulls_last=True), F("updated_at").desc()),
+        "updated_at_desc": ("-updated_at",),
+        "created_at_desc": ("-created_at",),
+        "company_asc": ("company_name", "-updated_at"),
+    }
+    return job_queryset.order_by(*sort_mapping.get(sort, sort_mapping["match_score_desc"]))
 
 
 class CandidateProfileView(APIView):
@@ -48,7 +93,9 @@ class CandidateProfileView(APIView):
 
 class JobListCreateView(APIView):
     def get(self, request):
-        jobs = Job.objects.all()
+        jobs = annotate_jobs_with_latest_match(Job.objects.all())
+        jobs = apply_job_filters(jobs, request)
+        jobs = apply_job_sorting(jobs, request)
         return Response(JobListSerializer(jobs, many=True).data)
 
     def post(self, request):
@@ -56,18 +103,43 @@ class JobListCreateView(APIView):
         serializer.is_valid(raise_exception=True)
         parsed = parse_job_text(serializer.validated_data["raw_text"])
         job = serializer.save(
+            workflow_status=Job.WorkflowStatus.SAVED,
+            is_saved=True,
             normalized_requirements=parsed["requirements"],
             normalized_preferred=parsed["preferred"],
         )
+        job = annotate_jobs_with_latest_match(Job.objects.filter(id=job.id)).get()
         return Response(JobDetailSerializer(job).data, status=status.HTTP_201_CREATED)
 
 
 class JobDetailView(APIView):
     def get(self, request, job_id):
-        job = Job.objects.filter(id=job_id).first()
+        job = annotate_jobs_with_latest_match(Job.objects.filter(id=job_id)).first()
         if job is None:
             return error_response("Job not found", code="JOB_NOT_FOUND", status_code=404)
         return Response(JobDetailSerializer(job).data)
+
+    def patch(self, request, job_id):
+        job = Job.objects.filter(id=job_id).first()
+        if job is None:
+            return error_response("Job not found", code="JOB_NOT_FOUND", status_code=404)
+
+        serializer = JobUpdateSerializer(instance=job, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data.copy()
+        workflow_status = validated_data.get("workflow_status", job.workflow_status)
+
+        if (
+            workflow_status == Job.WorkflowStatus.APPLIED
+            and "applied_date" not in validated_data
+            and job.applied_date is None
+        ):
+            validated_data["applied_date"] = timezone.localdate()
+
+        validated_data["is_saved"] = get_is_saved_for_workflow_status(workflow_status)
+        serializer.save(**validated_data)
+        refreshed_job = annotate_jobs_with_latest_match(Job.objects.filter(id=job_id)).get()
+        return Response(JobDetailSerializer(refreshed_job).data)
 
 
 class JobIngestUrlView(APIView):
@@ -86,7 +158,12 @@ class JobIngestUrlView(APIView):
             return error_response(exc.message, code=exc.code, status_code=exc.status_code)
 
         status_code = status.HTTP_201_CREATED if result.created else status.HTTP_200_OK
-        return Response(JobDetailSerializer(result.job).data, status=status_code)
+        if result.created:
+            result.job.workflow_status = Job.WorkflowStatus.DISCOVERED
+            result.job.is_saved = False
+            result.job.save(update_fields=["workflow_status", "is_saved", "updated_at"])
+        job = annotate_jobs_with_latest_match(Job.objects.filter(id=result.job.id)).get()
+        return Response(JobDetailSerializer(job).data, status=status_code)
 
 
 class JobAnalyzeView(APIView):
