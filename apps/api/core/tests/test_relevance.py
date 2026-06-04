@@ -9,6 +9,7 @@ class RelevanceEngineTests(TestCase):
         self.preferences = RecruitingPreferences.objects.create(
             target_terms=["Summer 2027"],
             role_types=["Backend", "Platform", "Systems", "Cloud"],
+            position_types=[Job.PositionType.INTERN],
             preferred_locations=["San Francisco"],
             remote_preference=RecruitingPreferences.RemotePreference.ANY,
             preferred_industries=["space"],
@@ -63,3 +64,18 @@ class RelevanceEngineTests(TestCase):
 
         assert result.classification == Job.Relevance.NOT_RELEVANT
         assert any("clearance" in flag.lower() for flag in result.flags)
+
+    def test_mismatched_position_type_adds_flag(self):
+        job = Job(
+            company_name="Northstar",
+            title="New Grad Software Engineer",
+            location="Remote",
+            raw_text="Summer 2027 full-time graduate software engineer role.",
+            normalized_requirements=["python"],
+            normalized_preferred=[],
+        )
+
+        result = evaluate_job_relevance(job, preferences=self.preferences, latest_match_score=88)
+
+        assert result.classification == Job.Relevance.NOT_RELEVANT
+        assert any("position does not match" in flag.lower() for flag in result.flags)

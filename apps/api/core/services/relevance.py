@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from django.utils import timezone
 
 from core.models import Job, MatchReport, RecruitingPreferences
+from core.services.position_types import DEFAULT_POSITION_TYPES, infer_position_type_for_job
 
 DEFAULT_TARGET_TERMS = [
     "Fall 2026",
@@ -67,6 +68,7 @@ def get_default_preferences_payload() -> dict[str, object]:
     return {
         "target_terms": DEFAULT_TARGET_TERMS,
         "role_types": DEFAULT_ROLE_TYPES,
+        "position_types": DEFAULT_POSITION_TYPES,
         "preferred_locations": [],
         "remote_preference": RecruitingPreferences.RemotePreference.ANY,
         "preferred_industries": [],
@@ -121,6 +123,23 @@ def _role_type_matches(search_text: str, selected_role_types: list[str]) -> list
         if any(keyword in search_text for keyword in keywords):
             matches.append(role_type)
     return matches
+
+
+def _position_type_matches(job: Job, preferences: RecruitingPreferences) -> tuple[bool, bool, str]:
+    selected_position_types = list(preferences.position_types or DEFAULT_POSITION_TYPES)
+    if not selected_position_types:
+        return True, False, job.position_type
+
+    effective_position_type = (
+        job.position_type
+        if job.position_type != Job.PositionType.UNKNOWN
+        else infer_position_type_for_job(job)
+    )
+
+    if effective_position_type == Job.PositionType.UNKNOWN:
+        return False, False, effective_position_type
+
+    return effective_position_type in selected_position_types, True, effective_position_type
 
 
 def _location_matches(job: Job, preferences: RecruitingPreferences) -> tuple[bool, bool]:
@@ -187,6 +206,17 @@ def evaluate_job_relevance(
         reasons.append(f"Role alignment: {', '.join(matched_role_types[:3])}.")
     else:
         flags.append("No preferred role-type match detected.")
+
+    position_type_match, position_type_known, effective_position_type = _position_type_matches(
+        job, preferences
+    )
+    effective_position_type_label = Job.PositionType(effective_position_type).label
+    if position_type_match:
+        score += 15
+        reasons.append(f"{effective_position_type_label} position matches your preferences.")
+    elif position_type_known:
+        score -= 20
+        flags.append(f"{effective_position_type_label} position does not match your preferences.")
 
     matched_target_terms = _contains_any(search_text, list(preferences.target_terms))
     if matched_target_terms:
@@ -262,6 +292,8 @@ def refresh_job_relevance(
     preferences: RecruitingPreferences | None = None,
     latest_match_score: int | None = None,
 ) -> RelevanceEvaluation:
+    inferred_position_type = infer_position_type_for_job(job)
+    job.position_type = inferred_position_type
     evaluation = evaluate_job_relevance(
         job,
         preferences=preferences,
@@ -273,6 +305,7 @@ def refresh_job_relevance(
     job.relevance_last_evaluated_at = timezone.now()
     job.save(
         update_fields=[
+            "position_type",
             "relevance",
             "relevance_reasons",
             "relevance_flags",

@@ -4,13 +4,15 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { SectionCard } from "@/components/section-card";
-import { getJobs, updateJob } from "@/lib/api";
+import { getJobs, getRecruitingPreferences, updateJob } from "@/lib/api";
 import type {
   Job,
+  JobPositionType,
   JobRelevance,
   JobsQuery,
   JobSort,
   JobWorkflowStatus,
+  PositionTypePreference,
   UpdateJobPayload,
 } from "@/lib/types";
 
@@ -47,6 +49,12 @@ const SORT_OPTIONS: Array<{ value: JobSort; label: string }> = [
   { value: "updated_at_desc", label: "Recently updated" },
   { value: "created_at_desc", label: "Recently added" },
   { value: "company_asc", label: "Company A-Z" },
+];
+
+const POSITION_TYPE_OPTIONS: Array<{ value: PositionTypePreference; label: string }> = [
+  { value: "INTERN", label: "Intern" },
+  { value: "FULL_TIME", label: "Full-time" },
+  { value: "PART_TIME", label: "Part-time" },
 ];
 
 function formatDate(value: string | null) {
@@ -94,6 +102,10 @@ function getRelevanceTone(relevance: JobRelevance) {
   }
 }
 
+function formatPositionType(positionType: JobPositionType) {
+  return positionType === "FULL_TIME" ? "FULL TIME" : positionType.replaceAll("_", " ");
+}
+
 export default function JobsPage() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -107,15 +119,49 @@ export default function JobsPage() {
   const [hideNotRelevant, setHideNotRelevant] = useState(true);
   const [recentlyAddedOnly, setRecentlyAddedOnly] = useState(false);
   const [sort, setSort] = useState<JobSort>("match_score_desc");
+  const [savedPositionTypes, setSavedPositionTypes] = useState<PositionTypePreference[] | null>(null);
+  const [positionFilter, setPositionFilter] = useState<PositionTypePreference[] | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [boardLoadedAt] = useState(() => Date.now());
 
   useEffect(() => {
     let isActive = true;
+
+    async function loadPreferences() {
+      try {
+        const preferences = await getRecruitingPreferences();
+        if (!isActive) {
+          return;
+        }
+        setSavedPositionTypes(preferences.position_types);
+        setPositionFilter(preferences.position_types);
+      } catch (loadError) {
+        if (!isActive) {
+          return;
+        }
+        setError(loadError instanceof Error ? loadError.message : "Failed to load jobs.");
+        setIsLoading(false);
+      }
+    }
+
+    void loadPreferences();
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (positionFilter === null) {
+      return;
+    }
+
+    let isActive = true;
     const query: JobsQuery = {
       view,
       relevance: relevanceFilter === "ALL" ? undefined : [relevanceFilter],
       status: statusFilter === "ALL" ? undefined : [statusFilter],
+      position_type: positionFilter.length ? positionFilter : undefined,
       hide_not_relevant: hideNotRelevant,
       recently_added: recentlyAddedOnly,
       include_archived: includeArchived,
@@ -147,7 +193,7 @@ export default function JobsPage() {
     return () => {
       isActive = false;
     };
-  }, [view, relevanceFilter, statusFilter, hideNotRelevant, recentlyAddedOnly, includeArchived, sort, refreshKey]);
+  }, [view, relevanceFilter, statusFilter, positionFilter, hideNotRelevant, recentlyAddedOnly, includeArchived, sort, refreshKey]);
 
   function handleRetry() {
     setIsLoading(true);
@@ -192,7 +238,7 @@ export default function JobsPage() {
     <div className="grid">
       <PageHeader
         title="Personalized Job Board"
-        description="Review the internships that best fit JP's recruiting goals while keeping workflow status and analysis history intact."
+        description="Review the roles that best fit JP's recruiting goals while keeping workflow status and analysis history intact."
         actions={
           <>
             <Link className="button button--secondary" href="/preferences/recruiting">
@@ -240,7 +286,7 @@ export default function JobsPage() {
 
       <SectionCard
         title="Board Controls"
-        description="Switch between your strict relevant queue and the full inventory, then refine by relevance, workflow stage, and freshness."
+        description="Switch between your strict relevant queue and the full inventory, then refine by relevance, position type, workflow stage, and freshness."
       >
         <div className="grid">
           <div className="segmented-control">
@@ -261,6 +307,47 @@ export default function JobsPage() {
           </div>
 
           <div className="dashboard-toolbar">
+            <div className="field">
+              <label>Position types</label>
+              <div className="filter-chip-row">
+                {POSITION_TYPE_OPTIONS.map((option) => {
+                  const isSelected = positionFilter?.includes(option.value) ?? false;
+                  return (
+                    <button
+                      className={`filter-chip${isSelected ? " filter-chip--active" : ""}`}
+                      key={option.value}
+                      onClick={() => {
+                        setIsLoading(true);
+                        setPositionFilter((current) => {
+                          if (!current) {
+                            return [option.value];
+                          }
+                          return isSelected
+                            ? current.filter((item) => item !== option.value)
+                            : [...current, option.value];
+                        });
+                      }}
+                      type="button"
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+              {savedPositionTypes ? (
+                <button
+                  className="button button--secondary"
+                  onClick={() => {
+                    setIsLoading(true);
+                    setPositionFilter(savedPositionTypes);
+                  }}
+                  type="button"
+                >
+                  Reset to Saved Preferences
+                </button>
+              ) : null}
+            </div>
+
             <div className="field">
               <label htmlFor="relevanceFilter">Relevance</label>
               <select
@@ -376,6 +463,7 @@ export default function JobsPage() {
                       <div className="dashboard-job-card__pills">
                         <span className={getRelevanceTone(job.relevance)}>{job.relevance.replaceAll("_", " ")}</span>
                         <span className={`status-pill ${getStatusTone(job.workflow_status)}`}>{job.workflow_status}</span>
+                        <span className="pill">{formatPositionType(job.position_type)}</span>
                         <span className="pill">{job.source_type}</span>
                         {job.relevance_score !== null ? <span className="pill">Relevance {job.relevance_score}</span> : null}
                         {job.latest_match_score !== null ? <span className="pill">Match {job.latest_match_score}</span> : null}
@@ -475,7 +563,7 @@ export default function JobsPage() {
           <div className="empty-state-panel">
             <p className="empty-state-title">No jobs match the current board view</p>
             <p className="empty-state">
-              Adjust the relevance, workflow, archive, or recently added filters, or add a new job to keep building the board.
+              Adjust the relevance, position type, workflow, archive, or recently added filters, or add a new job to keep building the board.
             </p>
             <div>
               <Link className="button" href="/jobs/new">

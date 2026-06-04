@@ -69,6 +69,7 @@ class PhaseZeroApiTests(APITestCase):
         assert create_job_response.data["content_hash"] is None
         assert create_job_response.data["last_seen_at"] is None
         assert create_job_response.data["workflow_status"] == "SAVED"
+        assert create_job_response.data["position_type"] == "INTERN"
         assert create_job_response.data["applied_date"] is None
         assert create_job_response.data["notes"] == ""
         assert create_job_response.data["next_action"] == ""
@@ -79,7 +80,7 @@ class PhaseZeroApiTests(APITestCase):
         assert create_job_response.data["relevance"] == "REVIEW"
         assert create_job_response.data["relevance_reasons"]
         assert create_job_response.data["relevance_flags"] == ["No target term match detected."]
-        assert create_job_response.data["relevance_score"] == 35
+        assert create_job_response.data["relevance_score"] == 50
         assert create_job_response.data["latest_match_score"] is None
         assert create_job_response.data["latest_recommendation"] is None
         assert create_job_response.data["latest_match_report_id"] is None
@@ -99,7 +100,7 @@ class PhaseZeroApiTests(APITestCase):
         assert Job.objects.get(id=job_id).source_type == Job.SourceType.MANUAL
         assert Job.objects.get(id=job_id).ingestion_status == Job.IngestionStatus.MANUAL
         assert Job.objects.get(id=job_id).workflow_status == Job.WorkflowStatus.SAVED
-        assert Job.objects.get(id=job_id).relevance == Job.Relevance.RELEVANT
+        assert Job.objects.get(id=job_id).relevance == Job.Relevance.HIGHLY_RELEVANT
 
     def test_analysis_keeps_history_and_latest_endpoint_returns_newest_report(self):
         self.client.post(
@@ -370,6 +371,7 @@ class RecruitingPreferencesApiTests(APITestCase):
             "Infrastructure",
             "AI/ML",
         ]
+        assert response.data["position_types"] == ["INTERN"]
         assert RecruitingPreferences.objects.count() == 1
 
     def test_preferences_post_upserts_and_recomputes_job_relevance(self):
@@ -390,6 +392,7 @@ class RecruitingPreferencesApiTests(APITestCase):
             {
                 "target_terms": ["Summer 2027"],
                 "role_types": ["Backend", "Systems", "Cloud"],
+                "position_types": ["INTERN", "FULL_TIME"],
                 "preferred_locations": ["Onsite"],
                 "remote_preference": "ONSITE",
                 "preferred_industries": [],
@@ -403,8 +406,9 @@ class RecruitingPreferencesApiTests(APITestCase):
 
         assert response.status_code == 200
         assert RecruitingPreferences.objects.count() == 1
+        assert response.data["position_types"] == ["INTERN", "FULL_TIME"]
         job = Job.objects.get(id=job_id)
-        assert job.relevance == Job.Relevance.REVIEW
+        assert job.relevance == Job.Relevance.RELEVANT
         assert job.relevance_reasons
 
     def test_jobs_endpoint_supports_relevance_filters_and_recently_added(self):
@@ -434,6 +438,32 @@ class RecruitingPreferencesApiTests(APITestCase):
         assert len(response.data) == 1
         assert response.data[0]["company_name"] == "Astranis"
 
+    def test_jobs_endpoint_supports_position_type_filter(self):
+        intern_job = Job.objects.create(
+            company_name="Astranis",
+            title="Backend Intern",
+            location="Remote",
+            position_type=Job.PositionType.INTERN,
+            raw_text="Summer 2027 backend internship remote",
+            relevance=Job.Relevance.HIGHLY_RELEVANT,
+            relevance_reasons=["Intern position matches your preferences."],
+        )
+        full_time_job = Job.objects.create(
+            company_name="Northstar",
+            title="New Grad Software Engineer",
+            location="Remote",
+            position_type=Job.PositionType.FULL_TIME,
+            raw_text="Summer 2027 full-time graduate role remote",
+            relevance=Job.Relevance.RELEVANT,
+            relevance_reasons=["Full-time position does not match your preferences."],
+        )
+
+        response = self.client.get("/api/v1/jobs?view=all&position_type=FULL_TIME")
+
+        assert response.status_code == 200
+        assert [item["id"] for item in response.data] == [str(full_time_job.id)]
+        assert str(intern_job.id) not in {item["id"] for item in response.data}
+
 
 class JobUrlIngestionApiTests(APITestCase):
     def test_ingest_url_creates_greenhouse_job(self):
@@ -459,6 +489,7 @@ class JobUrlIngestionApiTests(APITestCase):
         assert response.data["content_hash"]
         assert response.data["ingestion_status"] == "INGESTED"
         assert response.data["workflow_status"] == "DISCOVERED"
+        assert response.data["position_type"] == "INTERN"
         assert response.data["is_saved"] is False
         assert "python" in response.data["normalized_requirements"]
         assert "aws" in response.data["normalized_preferred"]
@@ -481,6 +512,7 @@ class JobUrlIngestionApiTests(APITestCase):
         assert response.data["company_name"] == "Bright Ridge"
         assert response.data["title"] == "Data Engineering Intern"
         assert response.data["location"] == "Austin, TX"
+        assert response.data["position_type"] == "INTERN"
         assert "sql" in response.data["normalized_requirements"]
         assert "aws" in response.data["normalized_preferred"]
 
@@ -513,6 +545,7 @@ class JobUrlIngestionApiTests(APITestCase):
                 assert response.status_code == 201
                 assert response.data["source_type"] == source_type
                 assert response.data["company_name"] == company_name
+                assert response.data["position_type"] == "INTERN"
 
     def test_ingest_url_returns_existing_job_for_duplicate_source_url(self):
         existing_job = Job.objects.create(

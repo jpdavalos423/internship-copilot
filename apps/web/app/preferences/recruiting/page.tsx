@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { SectionCard } from "@/components/section-card";
 import { getRecruitingPreferences, saveRecruitingPreferences } from "@/lib/api";
-import type { RemotePreference, SaveRecruitingPreferencesPayload } from "@/lib/types";
+import type { PositionTypePreference, RemotePreference, SaveRecruitingPreferencesPayload } from "@/lib/types";
 
 const TARGET_TERM_OPTIONS = ["Fall 2026", "Winter 2027", "Spring 2027", "Summer 2027"];
 const ROLE_TYPE_OPTIONS = [
@@ -20,6 +20,12 @@ const ROLE_TYPE_OPTIONS = [
   "Systems",
   "Developer Tools",
   "Cloud",
+];
+
+const POSITION_TYPE_OPTIONS: Array<{ value: PositionTypePreference; label: string }> = [
+  { value: "INTERN", label: "Intern" },
+  { value: "FULL_TIME", label: "Full-time" },
+  { value: "PART_TIME", label: "Part-time" },
 ];
 
 const REMOTE_OPTIONS: Array<{ value: RemotePreference; label: string }> = [
@@ -39,6 +45,11 @@ function parseListInput(value: string) {
 
 function formatListInput(values: string[]) {
   return values.join("\n");
+}
+
+function formatPositionTypes(values: PositionTypePreference[]) {
+  const labels = POSITION_TYPE_OPTIONS.filter((option) => values.includes(option.value)).map((option) => option.label);
+  return labels.length ? labels.join(", ") : "all position types";
 }
 
 export default function RecruitingPreferencesPage() {
@@ -63,6 +74,7 @@ export default function RecruitingPreferencesPage() {
         setForm({
           target_terms: preferences.target_terms,
           role_types: preferences.role_types,
+          position_types: preferences.position_types,
           preferred_locations: preferences.preferred_locations,
           remote_preference: preferences.remote_preference,
           preferred_industries: preferences.preferred_industries,
@@ -119,6 +131,7 @@ export default function RecruitingPreferencesPage() {
       setForm({
         target_terms: saved.target_terms,
         role_types: saved.role_types,
+        position_types: saved.position_types,
         preferred_locations: saved.preferred_locations,
         remote_preference: saved.remote_preference,
         preferred_industries: saved.preferred_industries,
@@ -139,7 +152,7 @@ export default function RecruitingPreferencesPage() {
   }
 
   const summary = form
-    ? `Prioritizing ${form.role_types.length ? form.role_types.join(", ") : "open-ended software"} internships for ${form.target_terms.join(", ")}, with ${form.remote_preference.toLowerCase()} work preference and a minimum match score of ${form.minimum_match_score}.`
+    ? `Prioritizing ${form.role_types.length ? form.role_types.join(", ") : "open-ended software"} roles across ${formatPositionTypes(form.position_types)} for ${form.target_terms.join(", ")}, with ${form.remote_preference.toLowerCase()} work preference and a minimum match score of ${form.minimum_match_score}.`
     : "";
 
   return (
@@ -212,6 +225,32 @@ export default function RecruitingPreferencesPage() {
                         type="button"
                       >
                         {option}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="field">
+                <label>Position types</label>
+                <div className="filter-chip-row">
+                  {POSITION_TYPE_OPTIONS.map((option) => {
+                    const isSelected = form.position_types.includes(option.value);
+                    return (
+                      <button
+                        className={`filter-chip${isSelected ? " filter-chip--active" : ""}`}
+                        key={option.value}
+                        onClick={() =>
+                          updateForm(
+                            "position_types",
+                            isSelected
+                              ? form.position_types.filter((item) => item !== option.value)
+                              : [...form.position_types, option.value],
+                          )
+                        }
+                        type="button"
+                      >
+                        {option.label}
                       </button>
                     );
                   })}

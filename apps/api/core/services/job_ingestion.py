@@ -13,6 +13,7 @@ from django.utils.html import strip_tags
 
 from core.models import Job
 from core.services.job_parser import parse_job_text
+from core.services.position_types import infer_position_type
 
 FETCH_TIMEOUT_SECONDS = 10
 USER_AGENT = "InternshipCopilot/phase2 (+https://localhost)"
@@ -456,6 +457,12 @@ def ingest_job_from_url(url: str) -> IngestJobResult:
         company_name=extracted.company_name,
         title=extracted.title,
         location=extracted.location,
+        position_type=infer_position_type(
+            title=extracted.title,
+            location=extracted.location,
+            raw_text=extracted.raw_text,
+            source_url=extracted.source_url,
+        ),
         raw_text=extracted.raw_text,
         source_type=extracted.source_type,
         source_url=extracted.source_url,

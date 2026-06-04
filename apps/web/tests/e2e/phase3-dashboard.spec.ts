@@ -5,6 +5,7 @@ type MockJob = {
   company_name: string;
   title: string;
   location: string;
+  position_type: "INTERN" | "FULL_TIME" | "PART_TIME" | "UNKNOWN";
   raw_text: string;
   source_type: "MANUAL" | "GREENHOUSE" | "LEVER" | "ASHBY" | "OTHER";
   source_url: string | null;
@@ -39,6 +40,7 @@ type MockPreferences = {
   id: string;
   target_terms: string[];
   role_types: string[];
+  position_types: ("INTERN" | "FULL_TIME" | "PART_TIME")[];
   preferred_locations: string[];
   remote_preference: "REMOTE" | "HYBRID" | "ONSITE" | "ANY";
   preferred_industries: string[];
@@ -75,6 +77,7 @@ async function mockRecruitingRoutes(page: Page) {
       company_name: "Astranis",
       title: "Backend Intern",
       location: "San Francisco, CA",
+      position_type: "INTERN",
       source_type: "MANUAL",
       ingestion_status: "MANUAL",
       workflow_status: "SAVED",
@@ -97,6 +100,7 @@ async function mockRecruitingRoutes(page: Page) {
       company_name: "Orbit Labs",
       title: "Platform Intern",
       location: "Remote",
+      position_type: "INTERN",
       source_type: "GREENHOUSE",
       source_url: "https://boards.greenhouse.io/orbit/jobs/222",
       external_id: "gh-222",
@@ -123,6 +127,7 @@ async function mockRecruitingRoutes(page: Page) {
       company_name: "Pine AI",
       title: "Security Intern",
       location: "New York, NY",
+      position_type: "INTERN",
       source_type: "ASHBY",
       source_url: "https://jobs.ashbyhq.com/pine/jobs/333",
       external_id: "ashby-333",
@@ -143,12 +148,40 @@ async function mockRecruitingRoutes(page: Page) {
       latest_match_score: 55,
       latest_recommendation: "LOW_PRIORITY",
     },
+    {
+      ...baseJob,
+      id: "55555555-5555-5555-5555-555555555555",
+      company_name: "Northstar",
+      title: "New Grad Software Engineer",
+      location: "Remote",
+      position_type: "FULL_TIME",
+      source_type: "LEVER",
+      source_url: "https://jobs.lever.co/northstar/jobs/555",
+      external_id: "lever-555",
+      content_hash: "content-555",
+      last_seen_at: "2026-06-04T20:30:00Z",
+      ingestion_status: "INGESTED",
+      workflow_status: "DISCOVERED",
+      applied_date: null,
+      notes: "",
+      next_action: "",
+      next_action_due_date: null,
+      is_archived: false,
+      is_saved: false,
+      relevance: "RELEVANT",
+      relevance_reasons: ["Full-time position does not match your preferences."],
+      relevance_flags: ["Full-time position does not match your preferences."],
+      relevance_score: 62,
+      latest_match_score: 78,
+      latest_recommendation: "REVIEW",
+    },
   ];
 
   const preferences: MockPreferences = {
     id: "44444444-4444-4444-4444-444444444444",
     target_terms: ["Fall 2026", "Winter 2027", "Spring 2027", "Summer 2027"],
     role_types: ["Backend", "Platform", "Systems", "Cloud"],
+    position_types: ["INTERN"],
     preferred_locations: ["San Francisco, CA"],
     remote_preference: "ANY",
     preferred_industries: ["space"],
@@ -209,6 +242,7 @@ async function mockRecruitingRoutes(page: Page) {
     const url = new URL(route.request().url());
     const relevanceFilter = url.searchParams.get("relevance");
     const statusFilter = url.searchParams.get("status");
+    const positionTypeFilter = url.searchParams.get("position_type");
     const includeArchived = url.searchParams.get("include_archived") === "true";
     const hideNotRelevant = url.searchParams.get("hide_not_relevant") === "true";
     const view = url.searchParams.get("view") ?? "relevant";
@@ -233,6 +267,11 @@ async function mockRecruitingRoutes(page: Page) {
     if (statusFilter) {
       const statuses = statusFilter.split(",");
       result = result.filter((job) => statuses.includes(job.workflow_status));
+    }
+
+    if (positionTypeFilter) {
+      const values = positionTypeFilter.split(",");
+      result = result.filter((job) => values.includes(job.position_type));
     }
 
     if (recentlyAdded) {
@@ -385,10 +424,27 @@ test("lets JP update recruiting preferences from the settings page", async ({ pa
   await expect(page.getByRole("heading", { name: "Recruiting Preferences" })).toBeVisible();
 
   await page.getByRole("button", { name: "Cloud" }).click();
+  await page.getByRole("button", { name: "Full-time" }).click();
   await page.getByLabel("Remote preference").selectOption("REMOTE");
   await page.getByLabel("Minimum match score").fill("70");
   await page.getByLabel("Excluded keywords").fill("clearance");
   await page.getByRole("button", { name: "Save Preferences" }).click();
 
   await expect(page.getByText("Preferences saved. Job relevance has been refreshed across the board.")).toBeVisible();
+});
+
+test("defaults jobs to saved position preferences and allows temporary overrides", async ({ page }) => {
+  await mockRecruitingRoutes(page);
+
+  await page.goto("/jobs");
+  await expect(page.getByRole("button", { name: "Intern" })).toHaveClass(/filter-chip--active/);
+  await expect(page.getByText("Backend Intern")).toBeVisible();
+  await expect(page.getByText("New Grad Software Engineer")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Full-time" }).click();
+
+  await expect(page.getByText("New Grad Software Engineer")).toBeVisible();
+  await page.getByRole("button", { name: "Reset to Saved Preferences" }).click();
+  await expect(page.getByText("New Grad Software Engineer")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Intern" })).toHaveClass(/filter-chip--active/);
 });

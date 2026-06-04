@@ -27,6 +27,7 @@ from core.services.answer_validation import AnswerValidationError
 from core.services.job_discovery import scan_all_sources, scan_source
 from core.services.job_ingestion import JobIngestionError, ingest_job_from_url
 from core.services.job_parser import parse_job_text
+from core.services.position_types import infer_position_type, infer_position_type_for_job
 from core.services.profile_parser import parse_profile_text
 from core.services.relevance import (
     evaluate_job_relevance,
@@ -53,6 +54,8 @@ def annotate_jobs_with_latest_match(job_queryset):
 
 def attach_relevance_scores(jobs, preferences):
     for job in jobs:
+        if job.position_type == Job.PositionType.UNKNOWN:
+            job.position_type = infer_position_type_for_job(job)
         evaluation = evaluate_job_relevance(
             job,
             preferences=preferences,
@@ -104,6 +107,14 @@ def apply_job_filters(job_queryset, request):
         selected_statuses = [item for item in statuses if item in valid_statuses]
         if selected_statuses:
             job_queryset = job_queryset.filter(workflow_status__in=selected_statuses)
+
+    position_type_filter = request.query_params.get("position_type")
+    if position_type_filter:
+        position_types = [item.strip().upper() for item in position_type_filter.split(",") if item.strip()]
+        valid_position_types = {choice for choice, _label in Job.PositionType.choices}
+        selected_position_types = [item for item in position_types if item in valid_position_types]
+        if selected_position_types:
+            job_queryset = job_queryset.filter(position_type__in=selected_position_types)
 
     recently_added = request.query_params.get("recently_added", "false").lower() == "true"
     if recently_added:
@@ -230,6 +241,11 @@ class JobListCreateView(APIView):
         job = serializer.save(
             workflow_status=Job.WorkflowStatus.SAVED,
             is_saved=True,
+            position_type=infer_position_type(
+                title=serializer.validated_data["title"],
+                location=serializer.validated_data["location"],
+                raw_text=serializer.validated_data["raw_text"],
+            ),
             normalized_requirements=parsed["requirements"],
             normalized_preferred=parsed["preferred"],
         )

@@ -41,6 +41,7 @@ class RecruitingPreferences(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     target_terms = models.JSONField(default=list, blank=True)
     role_types = models.JSONField(default=list, blank=True)
+    position_types = models.JSONField(default=list, blank=True)
     preferred_locations = models.JSONField(default=list, blank=True)
     remote_preference = models.CharField(
         max_length=16,
@@ -86,6 +87,12 @@ class JobSource(TimestampedModel):
 
 
 class Job(TimestampedModel):
+    class PositionType(models.TextChoices):
+        INTERN = "INTERN", "Intern"
+        FULL_TIME = "FULL_TIME", "Full-time"
+        PART_TIME = "PART_TIME", "Part-time"
+        UNKNOWN = "UNKNOWN", "Unknown"
+
     class WorkflowStatus(models.TextChoices):
         DISCOVERED = "DISCOVERED", "Discovered"
         SAVED = "SAVED", "Saved"
@@ -119,6 +126,11 @@ class Job(TimestampedModel):
     company_name = models.CharField(max_length=255)
     title = models.CharField(max_length=255)
     location = models.CharField(max_length=255, blank=True)
+    position_type = models.CharField(
+        max_length=16,
+        choices=PositionType.choices,
+        default=PositionType.UNKNOWN,
+    )
     raw_text = models.TextField()
     source_type = models.CharField(
         max_length=32,

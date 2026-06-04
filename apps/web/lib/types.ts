@@ -7,11 +7,14 @@ export type CandidateProfile = {
 };
 
 export type RemotePreference = "REMOTE" | "HYBRID" | "ONSITE" | "ANY";
+export type PositionTypePreference = "INTERN" | "FULL_TIME" | "PART_TIME";
+export type JobPositionType = PositionTypePreference | "UNKNOWN";
 
 export type RecruitingPreferences = {
   id: string;
   target_terms: string[];
   role_types: string[];
+  position_types: PositionTypePreference[];
   preferred_locations: string[];
   remote_preference: RemotePreference;
   preferred_industries: string[];
@@ -79,6 +82,7 @@ export type Job = {
   company_name: string;
   title: string;
   location: string;
+  position_type: JobPositionType;
   raw_text: string;
   source_type: "MANUAL" | "GREENHOUSE" | "LEVER" | "ASHBY" | "OTHER";
   source_url: string | null;
@@ -143,6 +147,7 @@ export type JobsQuery = {
   view?: "relevant" | "all";
   relevance?: JobRelevance[];
   status?: JobWorkflowStatus[];
+  position_type?: JobPositionType[];
   hide_not_relevant?: boolean;
   recently_added?: boolean;
   include_archived?: boolean;

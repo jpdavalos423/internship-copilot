@@ -185,6 +185,10 @@ export function getJobs(query?: JobsQuery) {
     search.set("status", query.status.join(","));
   }
 
+  if (query?.position_type?.length) {
+    search.set("position_type", query.position_type.join(","));
+  }
+
   if (query?.hide_not_relevant) {
     search.set("hide_not_relevant", "true");
   }
