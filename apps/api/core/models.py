@@ -59,3 +59,41 @@ class MatchReport(TimestampedModel):
 
     class Meta:
         ordering = ["-created_at"]
+
+
+class GeneratedAnswer(TimestampedModel):
+    class AnswerType(models.TextChoices):
+        WHY_COMPANY = "WHY_COMPANY", "Why Company"
+        WHY_ROLE = "WHY_ROLE", "Why Role"
+        GOOD_FIT = "GOOD_FIT", "Good Fit"
+        SELF_INTRODUCTION = "SELF_INTRODUCTION", "Self Introduction"
+        MOST_IMPRESSIVE_ACCOMPLISHMENT = (
+            "MOST_IMPRESSIVE_ACCOMPLISHMENT",
+            "Most Impressive Accomplishment",
+        )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    job = models.ForeignKey(Job, on_delete=models.CASCADE, related_name="generated_answers")
+    candidate_profile = models.ForeignKey(
+        CandidateProfile,
+        on_delete=models.CASCADE,
+        related_name="generated_answers",
+    )
+    match_report = models.ForeignKey(
+        MatchReport,
+        on_delete=models.CASCADE,
+        related_name="generated_answers",
+    )
+    answer_type = models.CharField(max_length=64, choices=AnswerType.choices)
+    content = models.TextField()
+    evidence_summary = models.JSONField(default=list, blank=True)
+    generator_version = models.CharField(max_length=64, default="phase1-local-v1")
+
+    class Meta:
+        ordering = ["answer_type", "-updated_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["job", "match_report", "answer_type"],
+                name="unique_generated_answer_per_analysis_type",
+            )
+        ]

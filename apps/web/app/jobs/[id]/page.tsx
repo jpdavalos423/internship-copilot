@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { AnalysisPanel } from "@/components/analysis-panel";
+import { ApplicationAnswersPanel } from "@/components/application-answers-panel";
 import { PageHeader } from "@/components/page-header";
 import { SectionCard } from "@/components/section-card";
-import { analyzeJob, getJob, getJobAnalysis } from "@/lib/api";
+import { analyzeJob, getJob, getLatestJobAnalysis } from "@/lib/api";
 import type { Job, MatchReport } from "@/lib/types";
 
 export default function JobDetailPage() {
@@ -24,6 +25,7 @@ export default function JobDetailPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const loadedJobIdRef = useRef<string | null>(null);
 
   async function loadJobAndAnalysis() {
     try {
@@ -32,19 +34,7 @@ export default function JobDetailPage() {
       setAnalysisError(null);
       const loadedJob = await getJob(jobId);
       setJob(loadedJob);
-
-      try {
-        const loadedAnalysis = await getJobAnalysis(jobId);
-        setAnalysis(loadedAnalysis);
-      } catch (analysisLoadError) {
-        const message =
-          analysisLoadError instanceof Error ? analysisLoadError.message : "No saved analysis yet.";
-        if (message.toLowerCase().includes("not found")) {
-          setAnalysis(null);
-        } else {
-          setAnalysisError(message);
-        }
-      }
+      setAnalysis(await getLatestJobAnalysis(jobId));
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Failed to load job.");
     } finally {
@@ -53,52 +43,27 @@ export default function JobDetailPage() {
   }
 
   useEffect(() => {
-    let isMounted = true;
+    if (loadedJobIdRef.current === jobId) {
+      return;
+    }
+    loadedJobIdRef.current = jobId;
 
     async function initialLoad() {
       try {
-        const loadedJob = await getJob(jobId);
-        if (!isMounted) {
-          return;
-        }
-        setJob(loadedJob);
+        setIsLoading(true);
         setError(null);
-
-        try {
-          const loadedAnalysis = await getJobAnalysis(jobId);
-          if (isMounted) {
-            setAnalysis(loadedAnalysis);
-            setAnalysisError(null);
-          }
-        } catch (analysisLoadError) {
-          if (!isMounted) {
-            return;
-          }
-          const message =
-            analysisLoadError instanceof Error ? analysisLoadError.message : "No saved analysis yet.";
-          if (message.toLowerCase().includes("not found")) {
-            setAnalysis(null);
-          } else {
-            setAnalysisError(message);
-          }
-        }
+        setAnalysisError(null);
+        const loadedJob = await getJob(jobId);
+        setJob(loadedJob);
+        setAnalysis(await getLatestJobAnalysis(jobId));
       } catch (loadError) {
-        if (!isMounted) {
-          return;
-        }
         setError(loadError instanceof Error ? loadError.message : "Failed to load job.");
       } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
+        setIsLoading(false);
       }
     }
 
     void initialLoad();
-
-    return () => {
-      isMounted = false;
-    };
   }, [jobId]);
 
   async function handleAnalyze() {
@@ -200,6 +165,7 @@ export default function JobDetailPage() {
       </div>
 
       <AnalysisPanel analysis={analysis} />
+      <ApplicationAnswersPanel analysis={analysis} jobId={jobId} />
     </div>
   );
 }

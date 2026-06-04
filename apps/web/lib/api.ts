@@ -2,6 +2,9 @@ import { apiBaseUrl } from "@/lib/config";
 import type {
   CandidateProfile,
   CreateJobPayload,
+  GenerateAnswerPayload,
+  GeneratedAnswer,
+  GeneratedAnswersResponse,
   Job,
   MatchReport,
   SaveProfilePayload,
@@ -9,20 +12,35 @@ import type {
 
 type ApiErrorPayload = {
   error?: {
+    code?: string;
     message?: string;
   };
 };
 
+export class ApiError extends Error {
+  status: number;
+  code?: string;
+
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.code = code;
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response;
+  const headers = new Headers(init?.headers ?? {});
+
+  if (init?.body && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
 
   try {
     response = await fetch(`${apiBaseUrl}${path}`, {
       ...init,
-      headers: {
-        "Content-Type": "application/json",
-        ...(init?.headers ?? {}),
-      },
+      headers,
       cache: "no-store",
     });
   } catch {
@@ -31,15 +49,17 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!response.ok) {
     let errorMessage = `Request failed with status ${response.status}.`;
+    let errorCode: string | undefined;
 
     try {
       const payload = (await response.json()) as ApiErrorPayload;
+      errorCode = payload.error?.code;
       if (payload.error?.message) {
         errorMessage = payload.error.message;
       }
     } catch {}
 
-    throw new Error(errorMessage);
+    throw new ApiError(errorMessage, response.status, errorCode);
   }
 
   return (await response.json()) as T;
@@ -47,6 +67,17 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export function getProfile() {
   return request<CandidateProfile>("/profile");
+}
+
+export async function getOptionalProfile() {
+  try {
+    return await getProfile();
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404 && error.code === "CANDIDATE_PROFILE_NOT_FOUND") {
+      return null;
+    }
+    throw error;
+  }
 }
 
 export function saveProfile(payload: SaveProfilePayload) {
@@ -80,4 +111,31 @@ export function analyzeJob(jobId: string) {
 
 export function getJobAnalysis(jobId: string) {
   return request<MatchReport>(`/jobs/${jobId}/analysis`);
+}
+
+export async function getLatestJobAnalysis(jobId: string) {
+  try {
+    return await getJobAnalysis(jobId);
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404 && error.code === "MATCH_REPORT_NOT_FOUND") {
+      return null;
+    }
+    throw error;
+  }
+}
+
+export function getJobAnalysisById(jobId: string, matchReportId: string) {
+  return request<MatchReport>(`/jobs/${jobId}/analysis/${matchReportId}`);
+}
+
+export function getJobAnswers(jobId: string, matchReportId?: string) {
+  const search = matchReportId ? `?match_report_id=${matchReportId}` : "";
+  return request<GeneratedAnswersResponse>(`/jobs/${jobId}/answers${search}`);
+}
+
+export function generateJobAnswer(jobId: string, payload: GenerateAnswerPayload) {
+  return request<GeneratedAnswer>(`/jobs/${jobId}/answers/generate`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }

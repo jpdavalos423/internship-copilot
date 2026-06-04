@@ -70,6 +70,19 @@ Frontend lint:
 pnpm lint:web
 ```
 
+Playwright E2E:
+
+```bash
+pnpm exec playwright install --with-deps chromium
+pnpm test:e2e
+```
+
+Playwright UI mode:
+
+```bash
+pnpm test:e2e:ui
+```
+
 Frontend production build:
 
 ```bash
@@ -85,3 +98,24 @@ pnpm build:web
 5. Open the new job detail page
 6. Run analysis
 7. Review match score, recommendation, reasoning, strengths, gaps, missing keywords, category-grouped skills, and score breakdown
+
+## Playwright E2E
+
+The Playwright suite lives in `apps/web/tests/e2e` and covers the full Phase 0 workflow:
+
+1. Open the homepage and navigate to `Profile`
+2. Paste the sample resume and save the profile
+3. Navigate to `New Job` and create the sample backend role
+4. Verify the redirect to the new job detail page
+5. Run analysis and verify match score, recommendation, strengths, and missing keywords
+
+The test runner starts isolated E2E servers automatically:
+
+- Next.js on `http://127.0.0.1:3100`
+- Django on `http://127.0.0.1:8100`
+- SQLite database at `apps/api/e2e.sqlite3`, flushed before each run
+
+Failure artifacts are enabled in `apps/web/playwright.config.ts`:
+
+- Screenshots: `only-on-failure`
+- Traces: `retain-on-failure`

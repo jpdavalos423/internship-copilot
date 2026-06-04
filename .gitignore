@@ -11,3 +11,6 @@ apps/api/db.sqlite3
 node_modules/
 dist/
 .next/
+playwright-report/
+test-results/
+apps/api/e2e.sqlite3

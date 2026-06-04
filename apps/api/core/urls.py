@@ -2,7 +2,10 @@ from django.urls import path
 
 from core.views import (
     CandidateProfileView,
+    JobAnswersListView,
+    JobAnswerGenerateView,
     JobAnalysisView,
+    JobAnalysisDetailView,
     JobAnalyzeView,
     JobDetailView,
     JobListCreateView,
@@ -14,4 +17,15 @@ urlpatterns = [
     path("jobs/<uuid:job_id>", JobDetailView.as_view(), name="job-detail"),
     path("jobs/<uuid:job_id>/analyze", JobAnalyzeView.as_view(), name="job-analyze"),
     path("jobs/<uuid:job_id>/analysis", JobAnalysisView.as_view(), name="job-analysis"),
+    path("jobs/<uuid:job_id>/answers", JobAnswersListView.as_view(), name="job-answers"),
+    path(
+        "jobs/<uuid:job_id>/answers/generate",
+        JobAnswerGenerateView.as_view(),
+        name="job-answer-generate",
+    ),
+    path(
+        "jobs/<uuid:job_id>/analysis/<uuid:match_report_id>",
+        JobAnalysisDetailView.as_view(),
+        name="job-analysis-detail",
+    ),
 ]

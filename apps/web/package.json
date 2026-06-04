@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint app components lib",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "next": "^16.2.7",
@@ -15,6 +17,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
+    "@playwright/test": "^1.60.0",
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",

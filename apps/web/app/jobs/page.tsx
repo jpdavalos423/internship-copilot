@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { SectionCard } from "@/components/section-card";
 import { getJobs } from "@/lib/api";
@@ -11,6 +11,7 @@ export default function JobsPage() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const hasLoadedRef = useRef(false);
 
   async function loadJobs() {
     try {
@@ -25,33 +26,12 @@ export default function JobsPage() {
   }
 
   useEffect(() => {
-    let isMounted = true;
-
-    async function initialLoad() {
-      try {
-        const nextJobs = await getJobs();
-        if (!isMounted) {
-          return;
-        }
-        setJobs(nextJobs);
-        setError(null);
-      } catch (loadError) {
-        if (!isMounted) {
-          return;
-        }
-        setError(loadError instanceof Error ? loadError.message : "Failed to load jobs.");
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
+    if (hasLoadedRef.current) {
+      return;
     }
+    hasLoadedRef.current = true;
 
-    void initialLoad();
-
-    return () => {
-      isMounted = false;
-    };
+    void loadJobs();
   }, []);
 
   return (

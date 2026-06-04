@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from core.models import CandidateProfile, Job, MatchReport
+from core.models import CandidateProfile, GeneratedAnswer, Job, MatchReport
 
 
 class CandidateProfileSerializer(serializers.ModelSerializer):
@@ -54,6 +54,7 @@ class JobDetailSerializer(JobListSerializer):
 
 
 class MatchReportSerializer(serializers.ModelSerializer):
+    match_report_id = serializers.UUIDField(source="id", read_only=True)
     job_id = serializers.UUIDField(source="job.id", read_only=True)
     candidate_profile_id = serializers.UUIDField(source="candidate_profile.id", read_only=True)
 
@@ -61,6 +62,7 @@ class MatchReportSerializer(serializers.ModelSerializer):
         model = MatchReport
         fields = [
             "id",
+            "match_report_id",
             "job_id",
             "candidate_profile_id",
             "match_score",
@@ -75,3 +77,36 @@ class MatchReportSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
+
+
+class GenerateAnswerRequestSerializer(serializers.Serializer):
+    answer_type = serializers.ChoiceField(choices=GeneratedAnswer.AnswerType.choices)
+    match_report_id = serializers.UUIDField()
+
+
+class GeneratedAnswerSerializer(serializers.ModelSerializer):
+    job_id = serializers.UUIDField(source="job.id", read_only=True)
+    candidate_profile_id = serializers.UUIDField(source="candidate_profile.id", read_only=True)
+    match_report_id = serializers.UUIDField(source="match_report.id", read_only=True)
+
+    class Meta:
+        model = GeneratedAnswer
+        fields = [
+            "id",
+            "job_id",
+            "candidate_profile_id",
+            "match_report_id",
+            "answer_type",
+            "content",
+            "evidence_summary",
+            "generator_version",
+            "created_at",
+            "updated_at",
+        ]
+
+
+class GeneratedAnswerListSerializer(serializers.Serializer):
+    job_id = serializers.UUIDField()
+    candidate_profile_id = serializers.UUIDField(allow_null=True)
+    match_report_id = serializers.UUIDField()
+    answers = GeneratedAnswerSerializer(many=True)

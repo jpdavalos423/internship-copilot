@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { ProfileForm } from "@/components/profile-form";
 import { SectionCard } from "@/components/section-card";
-import { getProfile, saveProfile } from "@/lib/api";
+import { getOptionalProfile, saveProfile } from "@/lib/api";
 import type { CandidateProfile } from "@/lib/types";
 
 export default function ProfilePage() {
@@ -16,64 +16,36 @@ export default function ProfilePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [hasProfile, setHasProfile] = useState(false);
+  const hasLoadedRef = useRef(false);
 
   async function loadProfile() {
     try {
       setIsLoading(true);
       setError(null);
-      const existingProfile = await getProfile();
-      setProfile(existingProfile);
-      setResumeText(existingProfile.resume_text);
-      setHasProfile(true);
-    } catch (loadError) {
-      const message = loadError instanceof Error ? loadError.message : "Failed to load profile.";
-      if (message.toLowerCase().includes("not found")) {
-        setHasProfile(false);
-        setProfile(null);
+      const existingProfile = await getOptionalProfile();
+      if (existingProfile) {
+        setProfile(existingProfile);
+        setResumeText(existingProfile.resume_text);
+        setHasProfile(true);
       } else {
-        setError(message);
+        setProfile(null);
+        setResumeText("");
+        setHasProfile(false);
       }
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Failed to load profile.");
     } finally {
       setIsLoading(false);
     }
   }
 
   useEffect(() => {
-    let isMounted = true;
-
-    async function initialLoad() {
-      try {
-        const existingProfile = await getProfile();
-        if (!isMounted) {
-          return;
-        }
-        setProfile(existingProfile);
-        setResumeText(existingProfile.resume_text);
-        setHasProfile(true);
-        setError(null);
-      } catch (loadError) {
-        if (!isMounted) {
-          return;
-        }
-        const message = loadError instanceof Error ? loadError.message : "Failed to load profile.";
-        if (message.toLowerCase().includes("not found")) {
-          setHasProfile(false);
-          setProfile(null);
-        } else {
-          setError(message);
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
+    if (hasLoadedRef.current) {
+      return;
     }
+    hasLoadedRef.current = true;
 
-    void initialLoad();
-
-    return () => {
-      isMounted = false;
-    };
+    void loadProfile();
   }, []);
 
   async function handleSave() {
