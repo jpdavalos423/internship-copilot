@@ -1,0 +1,13 @@
+.DS_Store
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+apps/api/.venv/
+apps/api/db.sqlite3
+
+node_modules/
+dist/
+.next/

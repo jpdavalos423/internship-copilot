@@ -1,0 +1,18 @@
+import type { Metadata } from "next";
+import "./globals.css";
+import { AppShell } from "@/components/app-shell";
+
+export const metadata: Metadata = {
+  title: "Internship Copilot",
+  description: "Phase 0 frontend for deterministic internship match analysis.",
+};
+
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  return (
+    <html lang="en">
+      <body>
+        <AppShell>{children}</AppShell>
+      </body>
+    </html>
+  );
+}

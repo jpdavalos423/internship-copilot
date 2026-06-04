@@ -1,0 +1,13 @@
+Frontend Software Engineer Intern
+Example Co
+Remote
+
+Qualifications:
+- React
+- TypeScript
+- JavaScript
+- REST APIs
+
+Preferred Qualifications:
+- Next.js
+- AWS

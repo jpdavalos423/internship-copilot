@@ -1,0 +1,19 @@
+JP Davalos
+
+Skills
+- Python
+- Django
+- React
+- TypeScript
+- PostgreSQL
+- AWS
+- Docker
+- Linux
+- GitHub Actions
+- Git
+
+Projects
+- Built REST APIs for a campus marketplace application.
+- Shipped a React + TypeScript dashboard backed by Django and PostgreSQL.
+- Containerized backend services with Docker for local development.
+- Deployed AWS services for internal tooling and set up CI/CD with GitHub Actions.
