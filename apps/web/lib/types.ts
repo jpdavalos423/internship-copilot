@@ -16,6 +16,15 @@ export type Job = {
   title: string;
   location: string;
   raw_text: string;
+  source_type: "MANUAL" | "GREENHOUSE" | "LEVER" | "ASHBY" | "OTHER";
+  source_url: string | null;
+  external_id: string | null;
+  content_hash: string | null;
+  last_seen_at: string | null;
+  ingestion_status: "MANUAL" | "INGESTED" | "FAILED";
+  is_archived: boolean;
+  is_hidden: boolean;
+  is_saved: boolean;
   normalized_requirements: string[];
   normalized_preferred: string[];
   created_at: string;

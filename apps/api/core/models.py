@@ -21,11 +21,40 @@ class CandidateProfile(TimestampedModel):
 
 
 class Job(TimestampedModel):
+    class SourceType(models.TextChoices):
+        MANUAL = "MANUAL", "Manual"
+        GREENHOUSE = "GREENHOUSE", "Greenhouse"
+        LEVER = "LEVER", "Lever"
+        ASHBY = "ASHBY", "Ashby"
+        OTHER = "OTHER", "Other"
+
+    class IngestionStatus(models.TextChoices):
+        MANUAL = "MANUAL", "Manual"
+        INGESTED = "INGESTED", "Ingested"
+        FAILED = "FAILED", "Failed"
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     company_name = models.CharField(max_length=255)
     title = models.CharField(max_length=255)
     location = models.CharField(max_length=255, blank=True)
     raw_text = models.TextField()
+    source_type = models.CharField(
+        max_length=32,
+        choices=SourceType.choices,
+        default=SourceType.MANUAL,
+    )
+    source_url = models.URLField(blank=True, null=True)
+    external_id = models.CharField(max_length=255, blank=True, null=True)
+    content_hash = models.CharField(max_length=255, blank=True, null=True)
+    last_seen_at = models.DateTimeField(blank=True, null=True)
+    ingestion_status = models.CharField(
+        max_length=32,
+        choices=IngestionStatus.choices,
+        default=IngestionStatus.MANUAL,
+    )
+    is_archived = models.BooleanField(default=False)
+    is_hidden = models.BooleanField(default=False)
+    is_saved = models.BooleanField(default=False)
     normalized_requirements = models.JSONField(default=list, blank=True)
     normalized_preferred = models.JSONField(default=list, blank=True)
 

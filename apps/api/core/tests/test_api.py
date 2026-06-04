@@ -59,6 +59,15 @@ class PhaseZeroApiTests(APITestCase):
         assert analyze_response.status_code == 201
         assert analysis_response.status_code == 200
         assert specific_analysis_response.status_code == 200
+        assert create_job_response.data["source_type"] == "MANUAL"
+        assert create_job_response.data["ingestion_status"] == "MANUAL"
+        assert create_job_response.data["source_url"] is None
+        assert create_job_response.data["external_id"] is None
+        assert create_job_response.data["content_hash"] is None
+        assert create_job_response.data["last_seen_at"] is None
+        assert create_job_response.data["is_archived"] is False
+        assert create_job_response.data["is_hidden"] is False
+        assert create_job_response.data["is_saved"] is False
         assert analyze_response.data["match_score"] == 90
         assert analyze_response.data["match_report_id"] == analyze_response.data["id"]
         assert analysis_response.data["match_report_id"] == analyze_response.data["match_report_id"]
@@ -71,6 +80,8 @@ class PhaseZeroApiTests(APITestCase):
         ]
         assert Job.objects.count() == 1
         assert MatchReport.objects.count() == 1
+        assert Job.objects.get(id=job_id).source_type == Job.SourceType.MANUAL
+        assert Job.objects.get(id=job_id).ingestion_status == Job.IngestionStatus.MANUAL
 
     def test_analysis_keeps_history_and_latest_endpoint_returns_newest_report(self):
         self.client.post(
