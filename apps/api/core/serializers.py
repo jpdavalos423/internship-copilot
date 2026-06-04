@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
-from core.models import CandidateProfile, GeneratedAnswer, Job, MatchReport, RecruitingPreferences
+from core.models import CandidateProfile, GeneratedAnswer, Job, JobSource, MatchReport, RecruitingPreferences
+from core.services.job_discovery import normalize_source_base_url
 
 
 class JobComputedFieldsSerializerMixin(serializers.ModelSerializer):
@@ -36,6 +37,66 @@ class RecruitingPreferencesSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
+
+
+class DiscoveryScanSummarySerializer(serializers.Serializer):
+    discovered_count = serializers.IntegerField()
+    created_count = serializers.IntegerField()
+    duplicate_count = serializers.IntegerField()
+    failed_count = serializers.IntegerField()
+    skipped_count = serializers.IntegerField()
+    errors = serializers.ListField(child=serializers.CharField())
+
+
+class JobSourceSerializer(serializers.ModelSerializer):
+    last_scan_summary = DiscoveryScanSummarySerializer(read_only=True)
+
+    class Meta:
+        model = JobSource
+        fields = [
+            "id",
+            "name",
+            "source_type",
+            "base_url",
+            "company_name",
+            "is_active",
+            "last_scanned_at",
+            "last_success_at",
+            "last_error",
+            "scan_interval_hours",
+            "last_scan_summary",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "id",
+            "last_scanned_at",
+            "last_success_at",
+            "last_error",
+            "last_scan_summary",
+            "created_at",
+            "updated_at",
+        ]
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        source_type = attrs.get("source_type")
+        base_url = attrs.get("base_url")
+        if source_type and base_url:
+            _normalized_type, normalized_url = normalize_source_base_url(base_url, source_type)
+            attrs["base_url"] = normalized_url
+        elif base_url and self.instance is not None:
+            _normalized_type, normalized_url = normalize_source_base_url(
+                base_url,
+                source_type or self.instance.source_type,
+            )
+            attrs["base_url"] = normalized_url
+        return attrs
+
+    def validate_scan_interval_hours(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("Scan interval must be at least 1 hour.")
+        return value
 
 
 class JobCreateSerializer(JobComputedFieldsSerializerMixin):

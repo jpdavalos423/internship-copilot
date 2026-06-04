@@ -1,0 +1,25 @@
+{
+  "apiVersion": "1",
+  "jobs": [
+    {
+      "title": "Product Security Intern",
+      "location": "New York, NY",
+      "employmentType": "Intern",
+      "workplaceType": "Hybrid",
+      "publishedAt": "2026-06-04T18:00:00Z",
+      "jobUrl": "https://jobs.ashbyhq.com/pine-ai/product-security-intern",
+      "applyUrl": "https://jobs.ashbyhq.com/pine-ai/apply/product-security-intern",
+      "isListed": true
+    },
+    {
+      "title": "Hidden Role",
+      "location": "Remote",
+      "employmentType": "FullTime",
+      "workplaceType": "Remote",
+      "publishedAt": "2026-06-04T18:00:00Z",
+      "jobUrl": "https://jobs.ashbyhq.com/pine-ai/hidden-role",
+      "applyUrl": "https://jobs.ashbyhq.com/pine-ai/apply/hidden-role",
+      "isListed": false
+    }
+  ]
+}

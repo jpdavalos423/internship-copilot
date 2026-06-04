@@ -420,12 +420,18 @@ class IngestJobResult:
     created: bool
 
 
+def _touch_existing_job(job: Job) -> Job:
+    job.last_seen_at = timezone.now()
+    job.save(update_fields=["last_seen_at", "updated_at"])
+    return job
+
+
 def ingest_job_from_url(url: str) -> IngestJobResult:
     normalized_input_url = normalize_job_url(url)
 
     existing_by_input_url = Job.objects.filter(source_url=normalized_input_url).first()
     if existing_by_input_url is not None:
-        return IngestJobResult(job=existing_by_input_url, created=False)
+        return IngestJobResult(job=_touch_existing_job(existing_by_input_url), created=False)
 
     source_type = detect_source_type(normalized_input_url)
     fetched = fetch_url_document(normalized_input_url)
@@ -433,7 +439,7 @@ def ingest_job_from_url(url: str) -> IngestJobResult:
 
     existing_by_final_url = Job.objects.filter(source_url=normalized_final_url).first()
     if existing_by_final_url is not None:
-        return IngestJobResult(job=existing_by_final_url, created=False)
+        return IngestJobResult(job=_touch_existing_job(existing_by_final_url), created=False)
 
     extracted = extract_job_posting(
         source_url=normalized_final_url,
@@ -443,7 +449,7 @@ def ingest_job_from_url(url: str) -> IngestJobResult:
 
     duplicate_by_hash = Job.objects.filter(content_hash=extracted.content_hash).first()
     if duplicate_by_hash is not None:
-        return IngestJobResult(job=duplicate_by_hash, created=False)
+        return IngestJobResult(job=_touch_existing_job(duplicate_by_hash), created=False)
 
     parsed = parse_job_text(extracted.raw_text)
     job = Job.objects.create(

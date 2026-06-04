@@ -1,0 +1,27 @@
+{
+  "jobs": [
+    {
+      "id": 12345,
+      "internal_job_id": 98765,
+      "title": "Backend Software Engineer Intern",
+      "updated_at": "2026-06-04T18:00:00Z",
+      "location": {
+        "name": "San Francisco, CA"
+      },
+      "absolute_url": "https://boards.greenhouse.io/orbitlabs/jobs/gh-12345"
+    },
+    {
+      "id": 12346,
+      "internal_job_id": null,
+      "title": "General Application",
+      "updated_at": "2026-06-04T18:00:00Z",
+      "location": {
+        "name": "Remote"
+      },
+      "absolute_url": "https://boards.greenhouse.io/orbitlabs/jobs/prospect-12346"
+    }
+  ],
+  "meta": {
+    "total": 2
+  }
+}

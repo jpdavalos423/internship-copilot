@@ -1,7 +1,9 @@
 import { apiBaseUrl } from "@/lib/config";
 import type {
   CandidateProfile,
+  CreateJobSourcePayload,
   CreateJobPayload,
+  JobSource,
   GenerateAnswerPayload,
   GeneratedAnswer,
   GeneratedAnswersResponse,
@@ -10,8 +12,11 @@ import type {
   JobsQuery,
   MatchReport,
   RecruitingPreferences,
+  ScanAllSourcesResponse,
+  ScanSourceResponse,
   SaveRecruitingPreferencesPayload,
   SaveProfilePayload,
+  UpdateJobSourcePayload,
   UpdateJobPayload,
 } from "@/lib/types";
 
@@ -124,6 +129,38 @@ export function saveProfile(payload: SaveProfilePayload) {
 
 export function getRecruitingPreferences() {
   return request<RecruitingPreferences>("/preferences/recruiting");
+}
+
+export function getJobSources() {
+  return request<JobSource[]>("/sources");
+}
+
+export function createJobSource(payload: CreateJobSourcePayload) {
+  return request<JobSource>("/sources", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateJobSource(sourceId: string, payload: UpdateJobSourcePayload) {
+  return request<JobSource>(`/sources/${sourceId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function scanJobSource(sourceId: string) {
+  return request<ScanSourceResponse>(`/sources/${sourceId}/scan`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
+export function scanAllJobSources() {
+  return request<ScanAllSourcesResponse>("/sources/scan-all", {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
 }
 
 export function saveRecruitingPreferences(payload: SaveRecruitingPreferencesPayload) {

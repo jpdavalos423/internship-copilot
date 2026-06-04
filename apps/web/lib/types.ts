@@ -26,6 +26,49 @@ export type RecruitingPreferences = {
 export type SaveRecruitingPreferencesPayload = Omit<RecruitingPreferences, "id" | "created_at" | "updated_at">;
 
 export type JobRelevance = "HIGHLY_RELEVANT" | "RELEVANT" | "REVIEW" | "NOT_RELEVANT";
+export type JobSourceType = "GREENHOUSE" | "LEVER" | "ASHBY";
+
+export type DiscoveryScanSummary = {
+  discovered_count: number;
+  created_count: number;
+  duplicate_count: number;
+  failed_count: number;
+  skipped_count: number;
+  errors: string[];
+};
+
+export type JobSource = {
+  id: string;
+  name: string;
+  source_type: JobSourceType;
+  base_url: string;
+  company_name: string;
+  is_active: boolean;
+  last_scanned_at: string | null;
+  last_success_at: string | null;
+  last_error: string;
+  scan_interval_hours: number;
+  last_scan_summary: DiscoveryScanSummary;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CreateJobSourcePayload = Pick<
+  JobSource,
+  "name" | "source_type" | "base_url" | "company_name" | "is_active" | "scan_interval_hours"
+>;
+
+export type UpdateJobSourcePayload = Partial<CreateJobSourcePayload>;
+
+export type ScanSourceResponse = {
+  source: JobSource;
+  summary: DiscoveryScanSummary;
+};
+
+export type ScanAllSourcesResponse = {
+  summary: DiscoveryScanSummary;
+  results: ScanSourceResponse[];
+};
 
 export type SaveProfilePayload = {
   resume_text: string;

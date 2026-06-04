@@ -6,9 +6,10 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from core.models import CandidateProfile, GeneratedAnswer, Job, MatchReport, RecruitingPreferences
+from core.models import CandidateProfile, GeneratedAnswer, Job, JobSource, MatchReport, RecruitingPreferences
 from core.serializers import (
     CandidateProfileSerializer,
+    DiscoveryScanSummarySerializer,
     GeneratedAnswerListSerializer,
     GeneratedAnswerSerializer,
     GenerateAnswerRequestSerializer,
@@ -16,12 +17,14 @@ from core.serializers import (
     JobDetailSerializer,
     JobIngestUrlSerializer,
     JobListSerializer,
+    JobSourceSerializer,
     JobUpdateSerializer,
     MatchReportSerializer,
     RecruitingPreferencesSerializer,
 )
 from core.services.answer_generation import generate_answer_for_match_report
 from core.services.answer_validation import AnswerValidationError
+from core.services.job_discovery import scan_all_sources, scan_source
 from core.services.job_ingestion import JobIngestionError, ingest_job_from_url
 from core.services.job_parser import parse_job_text
 from core.services.profile_parser import parse_profile_text
@@ -155,6 +158,60 @@ class RecruitingPreferencesView(APIView):
         preferences = serializer.save()
         refresh_all_job_relevance(preferences=preferences)
         return Response(RecruitingPreferencesSerializer(preferences).data, status=status.HTTP_200_OK)
+
+
+class JobSourceListCreateView(APIView):
+    def get(self, request):
+        sources = JobSource.objects.all()
+        return Response(JobSourceSerializer(sources, many=True).data)
+
+    def post(self, request):
+        serializer = JobSourceSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        source = serializer.save()
+        return Response(JobSourceSerializer(source).data, status=status.HTTP_201_CREATED)
+
+
+class JobSourceDetailView(APIView):
+    def patch(self, request, source_id):
+        source = JobSource.objects.filter(id=source_id).first()
+        if source is None:
+            return error_response("Job source not found", code="JOB_SOURCE_NOT_FOUND", status_code=404)
+
+        serializer = JobSourceSerializer(instance=source, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        source = serializer.save()
+        return Response(JobSourceSerializer(source).data)
+
+
+class JobSourceScanView(APIView):
+    def post(self, request, source_id):
+        source = JobSource.objects.filter(id=source_id).first()
+        if source is None:
+            return error_response("Job source not found", code="JOB_SOURCE_NOT_FOUND", status_code=404)
+
+        result = scan_source(source)
+        payload = {
+            "source": JobSourceSerializer(result.source).data,
+            "summary": DiscoveryScanSummarySerializer(result.summary.to_dict()).data,
+        }
+        return Response(payload, status=status.HTTP_200_OK)
+
+
+class JobSourceScanAllView(APIView):
+    def post(self, request):
+        result = scan_all_sources()
+        payload = {
+            "summary": DiscoveryScanSummarySerializer(result.summary.to_dict()).data,
+            "results": [
+                {
+                    "source": JobSourceSerializer(source_result.source).data,
+                    "summary": DiscoveryScanSummarySerializer(source_result.summary.to_dict()).data,
+                }
+                for source_result in result.sources
+            ],
+        }
+        return Response(payload, status=status.HTTP_200_OK)
 
 
 class JobListCreateView(APIView):

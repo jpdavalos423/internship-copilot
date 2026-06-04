@@ -11,6 +11,17 @@ class TimestampedModel(models.Model):
         abstract = True
 
 
+def default_scan_summary() -> dict[str, object]:
+    return {
+        "discovered_count": 0,
+        "created_count": 0,
+        "duplicate_count": 0,
+        "failed_count": 0,
+        "skipped_count": 0,
+        "errors": [],
+    }
+
+
 class CandidateProfile(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     resume_text = models.TextField()
@@ -44,6 +55,34 @@ class RecruitingPreferences(TimestampedModel):
 
     class Meta:
         ordering = ["-updated_at"]
+
+
+class JobSource(TimestampedModel):
+    class SourceType(models.TextChoices):
+        GREENHOUSE = "GREENHOUSE", "Greenhouse"
+        LEVER = "LEVER", "Lever"
+        ASHBY = "ASHBY", "Ashby"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=255)
+    source_type = models.CharField(max_length=32, choices=SourceType.choices)
+    base_url = models.URLField()
+    company_name = models.CharField(max_length=255)
+    is_active = models.BooleanField(default=True)
+    last_scanned_at = models.DateTimeField(blank=True, null=True)
+    last_success_at = models.DateTimeField(blank=True, null=True)
+    last_error = models.TextField(blank=True, default="")
+    scan_interval_hours = models.PositiveIntegerField(default=24)
+    last_scan_summary = models.JSONField(default=default_scan_summary, blank=True)
+
+    class Meta:
+        ordering = ["company_name", "name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["source_type", "base_url"],
+                name="unique_job_source_type_base_url",
+            )
+        ]
 
 
 class Job(TimestampedModel):

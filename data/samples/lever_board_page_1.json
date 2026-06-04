@@ -1,0 +1,20 @@
+[
+  {
+    "id": "lever-1",
+    "text": "Platform Engineering Intern",
+    "categories": {
+      "location": "Remote"
+    },
+    "hostedUrl": "https://jobs.lever.co/launchpoint/platform-engineering-intern",
+    "workplaceType": "remote"
+  },
+  {
+    "id": "lever-2",
+    "text": "Senior Sales Manager",
+    "categories": {
+      "location": "New York, NY"
+    },
+    "hostedUrl": "https://jobs.lever.co/launchpoint/senior-sales-manager",
+    "workplaceType": "on-site"
+  }
+]
