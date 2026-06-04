@@ -921,7 +921,7 @@ archive_old_roles
 Example cron schedule:
 
 ```text
-0 9 * * * cd ~/Developer/internship-copilot && ./scripts/scan_jobs.sh
+0 9 * * * cd ~/Developer/internship-copilot/apps/api && /usr/bin/env uv run python manage.py scan_job_sources
 ```
 
 ---

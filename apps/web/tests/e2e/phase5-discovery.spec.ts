@@ -30,6 +30,7 @@ type MockJob = {
   company_name: string;
   title: string;
   location: string;
+  position_type?: "INTERN" | "FULL_TIME" | "PART_TIME" | "UNKNOWN";
   raw_text: string;
   source_type: "MANUAL" | "GREENHOUSE" | "LEVER" | "ASHBY" | "OTHER";
   source_url: string | null;
@@ -60,6 +61,22 @@ type MockJob = {
   latest_analysis_created_at: string | null;
 };
 
+type MockPreferences = {
+  id: string;
+  target_terms: string[];
+  role_types: string[];
+  position_types: Array<"INTERN" | "FULL_TIME" | "PART_TIME">;
+  preferred_locations: string[];
+  remote_preference: "REMOTE" | "HYBRID" | "ONSITE" | "ANY";
+  preferred_industries: string[];
+  excluded_keywords: string[];
+  minimum_match_score: number;
+  include_sponsorship_required_roles: boolean;
+  include_clearance_required_roles: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 function buildEmptySummary(): DiscoveryScanSummary {
   return {
     discovered_count: 0,
@@ -73,7 +90,67 @@ function buildEmptySummary(): DiscoveryScanSummary {
 
 async function mockSourceRoutes(page: Page) {
   const sources: JobSource[] = [];
-  const jobs: MockJob[] = [];
+  const jobs: MockJob[] = [
+    {
+      id: "99999999-9999-9999-9999-999999999999",
+      company_name: "Legacy Labs",
+      title: "Older Backend Intern",
+      location: "Remote",
+      position_type: "INTERN",
+      raw_text: "Summer 2026 internship\nPython",
+      source_type: "GREENHOUSE",
+      source_url: "https://boards.greenhouse.io/legacy/jobs/999",
+      external_id: "gh-999",
+      content_hash: "content-999",
+      last_seen_at: "2026-05-20T20:30:00Z",
+      ingestion_status: "INGESTED",
+      workflow_status: "DISCOVERED",
+      applied_date: null,
+      notes: "",
+      next_action: "",
+      next_action_due_date: null,
+      is_archived: false,
+      is_hidden: false,
+      is_saved: false,
+      normalized_requirements: ["python"],
+      normalized_preferred: [],
+      relevance: "RELEVANT",
+      relevance_reasons: ["Older discovery."],
+      relevance_flags: [],
+      relevance_last_evaluated_at: "2026-05-20T20:30:00Z",
+      relevance_score: 70,
+      created_at: "2026-05-20T20:30:00Z",
+      updated_at: "2026-05-20T20:30:00Z",
+      latest_match_score: null,
+      latest_recommendation: null,
+      latest_match_report_id: null,
+      latest_analysis_created_at: null,
+    },
+  ];
+  const preferences: MockPreferences = {
+    id: "44444444-4444-4444-4444-444444444444",
+    target_terms: ["Summer 2027"],
+    role_types: ["Backend", "Platform", "Systems"],
+    position_types: ["INTERN"],
+    preferred_locations: ["Remote", "San Francisco, CA"],
+    remote_preference: "ANY",
+    preferred_industries: [],
+    excluded_keywords: [],
+    minimum_match_score: 60,
+    include_sponsorship_required_roles: false,
+    include_clearance_required_roles: false,
+    created_at: "2026-06-04T20:30:00Z",
+    updated_at: "2026-06-04T20:30:00Z",
+  };
+  let lastJobsRequestUrl: string | null = null;
+
+  await page.route("**/api/v1/preferences/recruiting", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(preferences),
+    });
+  });
 
   await page.route("**/api/v1/sources", async (route) => {
     if (route.request().method() === "GET") {
@@ -184,6 +261,41 @@ async function mockSourceRoutes(page: Page) {
         latest_match_report_id: null,
         latest_analysis_created_at: null,
       });
+      jobs.push({
+        id: "22222222-2222-2222-2222-222222222222",
+        company_name: "Signal Defense",
+        title: "Security Research Intern",
+        location: "Remote",
+        position_type: "INTERN",
+        raw_text: "Summer 2027 internship\nClearance preferred",
+        source_type: "ASHBY",
+        source_url: "https://jobs.ashbyhq.com/signal/jobs/222",
+        external_id: "ashby-222",
+        content_hash: "content-222",
+        last_seen_at: "2026-06-05T20:30:00Z",
+        ingestion_status: "INGESTED",
+        workflow_status: "DISCOVERED",
+        applied_date: null,
+        notes: "",
+        next_action: "",
+        next_action_due_date: null,
+        is_archived: false,
+        is_hidden: false,
+        is_saved: false,
+        normalized_requirements: ["security"],
+        normalized_preferred: [],
+        relevance: "NOT_RELEVANT",
+        relevance_reasons: ["Out of scope."],
+        relevance_flags: ["Requires a niche security focus."],
+        relevance_last_evaluated_at: "2026-06-05T20:30:00Z",
+        relevance_score: 20,
+        created_at: "2026-06-05T20:30:00Z",
+        updated_at: "2026-06-05T20:30:00Z",
+        latest_match_score: null,
+        latest_recommendation: null,
+        latest_match_report_id: null,
+        latest_analysis_created_at: null,
+      });
     }
 
     await route.fulfill({
@@ -269,14 +381,54 @@ async function mockSourceRoutes(page: Page) {
   });
 
   await page.route("**/api/v1/jobs?**", async (route) => {
+    lastJobsRequestUrl = route.request().url();
+    const url = new URL(lastJobsRequestUrl);
+    const view = url.searchParams.get("view");
+    const recentlyAdded = url.searchParams.get("recently_added") === "true";
+    const includeArchived = url.searchParams.get("include_archived") === "true";
+    const hideNotRelevant = url.searchParams.get("hide_not_relevant") === "true";
+    const status = url.searchParams.get("status");
+    const relevance = url.searchParams.get("relevance");
+    const sort = url.searchParams.get("sort");
+    const recentThreshold = new Date("2026-05-29T00:00:00Z").getTime();
+
+    let result = [...jobs];
+
+    if (!includeArchived) {
+      result = result.filter((job) => !job.is_archived);
+    }
+    if (view === "relevant" && !relevance) {
+      result = result.filter((job) => ["HIGHLY_RELEVANT", "RELEVANT"].includes(job.relevance));
+    }
+    if (hideNotRelevant) {
+      result = result.filter((job) => job.relevance !== "NOT_RELEVANT");
+    }
+    if (status) {
+      const statuses = status.split(",");
+      result = result.filter((job) => statuses.includes(job.workflow_status));
+    }
+    if (relevance) {
+      const relevances = relevance.split(",");
+      result = result.filter((job) => relevances.includes(job.relevance));
+    }
+    if (recentlyAdded) {
+      result = result.filter((job) => new Date(job.created_at).getTime() >= recentThreshold);
+    }
+    if (sort === "newest_first" || sort === "created_at_desc") {
+      result.sort((left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime());
+    }
+
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify(jobs),
+      body: JSON.stringify(result),
     });
   });
 
-  return { sources };
+  return {
+    sources,
+    getLastJobsRequestUrl: () => lastJobsRequestUrl,
+  };
 }
 
 test("adds a source, scans it, and shows the latest summary", async ({ page }) => {
@@ -334,7 +486,7 @@ test("handles a failed source scan and shows the saved error state", async ({ pa
 });
 
 test("scan all updates sources and discovered jobs appear in the Personalized Job Board", async ({ page }) => {
-  await mockSourceRoutes(page);
+  const { getLastJobsRequestUrl } = await mockSourceRoutes(page);
 
   await page.goto("/sources");
   await page.getByLabel("Source name").fill("Orbit Labs Internships");
@@ -348,8 +500,19 @@ test("scan all updates sources and discovered jobs appear in the Personalized Jo
 
   await page.getByRole("link", { name: "View discovered jobs" }).click();
   await expect(page).toHaveURL(/\/jobs\?view=all&recently_added=true$/);
+  await expect(page.getByRole("heading", { name: "All Jobs" })).toBeVisible();
   await expect(page.getByText("Orbit Labs")).toBeVisible();
   await expect(page.getByText("Backend Software Engineer Intern")).toBeVisible();
+  await expect(page.getByText("Signal Defense")).toBeVisible();
+  await expect(page.getByText("Legacy Labs")).toHaveCount(0);
+  await expect(page.getByText("Unknown")).toBeVisible();
+
+  const lastJobsRequestUrl = getLastJobsRequestUrl();
+  expect(lastJobsRequestUrl).not.toBeNull();
+  const lastJobsRequest = new URL(lastJobsRequestUrl ?? "http://127.0.0.1");
+  expect(lastJobsRequest.searchParams.get("view")).toBe("all");
+  expect(lastJobsRequest.searchParams.get("recently_added")).toBe("true");
+  expect(lastJobsRequest.searchParams.get("position_type")).toBeNull();
 });
 
 test("disabling a source updates the UI state before scan all", async ({ page }) => {

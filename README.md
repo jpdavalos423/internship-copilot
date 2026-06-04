@@ -89,6 +89,19 @@ Frontend production build:
 pnpm build:web
 ```
 
+Scheduled discovery scan:
+
+```bash
+cd apps/api
+uv run python manage.py scan_job_sources
+```
+
+Example cron entry:
+
+```cron
+0 9 * * * cd /Users/jpdavalos/Documents/Developer/Personal/internship-copilot/apps/api && /usr/bin/env uv run python manage.py scan_job_sources
+```
+
 ## Phase 0 Manual Flow
 
 1. Open `http://127.0.0.1:3000/profile`
